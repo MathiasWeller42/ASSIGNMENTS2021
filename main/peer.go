@@ -87,6 +87,7 @@ func (peer *Peer) TakeNewConnection(listener net.Listener) {
 		panic(-1)
 	}
 	//add the new connection to connections
+	fmt.Println("Adding this connections to slice:", in_conn)
 	peer.AppendToConnections(in_conn)
 	peer.SendConnections(in_conn)
 	//handle input from the new connection and send all previous messages to new
@@ -116,10 +117,11 @@ func (peer *Peer) ConnectToNetwork(uri string) net.Conn {
 		return nil
 	} else {
 		fmt.Println("Connected to peer in network, you can now send and receive from the network")
-		peer.connectionsMutex.Lock()
-		peer.Connections = peer.ReceiveConnections(out_conn)
-		peer.connectionsMutex.Unlock()
-
+		/*
+			peer.connectionsMutex.Lock()
+			peer.Connections = peer.ReceiveConnections(out_conn)
+			peer.connectionsMutex.Unlock()
+		*/
 		//make connections to 10 newest peers!!!
 		//broadcast own presence!!!
 
@@ -131,7 +133,7 @@ func (peer *Peer) ConnectToNetwork(uri string) net.Conn {
 func (peer *Peer) ReceiveConnections(coming_from net.Conn) []net.Conn {
 	reader := bufio.NewReader(coming_from)
 	marshalled, err := reader.ReadBytes(']') //!!! Correct delimiter
-	fmt.Println(marshalled)
+	fmt.Println("Received the still marshalled connections list:", marshalled, " now calling demarshal:")
 	if err != nil {
 		fmt.Println("Lost connection to Peer")
 		return make([]net.Conn, 0)
@@ -195,8 +197,8 @@ func (peer *Peer) SendTransaction(conn net.Conn, transaction Transaction) {
 }
 
 func (peer *Peer) SendConnections(conn net.Conn) {
-	fmt.Println(peer.Connections)
-	marshalled := peer.MarshalConnections(peer.GetConnections())
+	fmt.Println("Now marshalling this connections array: ", peer.Connections)
+	marshalled := peer.MarshalConnections(peer.Connections)
 	_, err := conn.Write(marshalled)
 	fmt.Println("Sent connections to new peer")
 	if err != nil {
@@ -276,7 +278,8 @@ func (peer *Peer) DemarshalTransaction(bytes []byte) Transaction {
 
 func (peer *Peer) MarshalConnections(connections []net.Conn) []byte {
 	peer.connectionsMutex.Lock()
-	bytes, err := json.Marshal(peer.GetConnections())
+	fmt.Println("Marshalling performed on this array:", connections, " end of array")
+	bytes, err := json.Marshal(connections)
 	peer.connectionsMutex.Unlock()
 	if err != nil {
 		fmt.Println("Marshaling failed")
@@ -287,7 +290,7 @@ func (peer *Peer) MarshalConnections(connections []net.Conn) []byte {
 }
 
 func (peer *Peer) DemarshalConnections(bytes []byte) []net.Conn {
-	var connections Connections
+	var connections []net.Conn
 	//bytes = append(bytes, "]"...)
 	err := json.Unmarshal(bytes, &connections)
 	if err != nil {
@@ -299,4 +302,28 @@ func (peer *Peer) DemarshalConnections(bytes []byte) []net.Conn {
 
 func (peer *Peer) GetConnections() []net.Conn {
 	return peer.Connections
+}
+
+func (peer *Peer) MarshalConnections1(connections net.Conn) []byte {
+	peer.connectionsMutex.Lock()
+	fmt.Println("Marshalling performed on this array: end of array")
+	bytes, err := json.Marshal(connections)
+	peer.connectionsMutex.Unlock()
+	if err != nil {
+		fmt.Println("Marshaling failed")
+	}
+	//bytes = append(bytes, "\n"...)
+	fmt.Println(bytes)
+	return bytes
+}
+
+func (peer *Peer) DemarshalConnections1(bytes []byte) net.Conn {
+	var connections net.Conn
+	//bytes = append(bytes, "]"...)
+	err := json.Unmarshal(bytes, &connections)
+	if err != nil {
+		fmt.Println("Demarshaling failed", err)
+	}
+	fmt.Println(connections)
+	return connections
 }

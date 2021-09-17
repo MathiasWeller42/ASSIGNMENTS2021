@@ -8,15 +8,34 @@ import (
 )
 
 func TestShouldReadMarshalledValuesCorrectlyFromConn(t *testing.T) {
-	peer1, peer2 := connectTwoPeers(t)
-	realConn := peer1.GetConnections()
-	go peer1.SendConnections(realConn[0])
-	connections := peer2.ReceiveConnections(realConn[0])
-	sentCorrectly := testEq(connections, realConn)
+	peer1, _ := connectTwoPeers(t)
+	time.Sleep(1 * time.Second)
+	realConn := peer1.Connections
+	fmt.Println("Testing on this array:", realConn, "with length: ", len(realConn))
+	marshalledConn := peer1.MarshalConnections(realConn)
+	demarshalledConn := peer1.DemarshalConnections(marshalledConn)
+	sentCorrectly := testEq(demarshalledConn, realConn)
 	if !sentCorrectly {
-		t.Error("Expected,", realConn, "Got", connections)
+		t.Error("Expected,", realConn, "Got", demarshalledConn)
 	} else {
 		fmt.Println("TestShouldReadMarshalledValuesCorrectlyFromConn passed")
+	}
+}
+
+func TestShouldReadMarshalledConn(t *testing.T) {
+	peer1, _ := connectTwoPeers(t)
+	time.Sleep(1 * time.Second)
+	realConn := peer1.Connections[0]
+	fmt.Println("Testing on this array:", realConn, "with length: , len(realConn)")
+	marshalledConn := peer1.MarshalConnections1(realConn)
+	demarshalledConn := peer1.DemarshalConnections1(marshalledConn)
+	//sentCorrectly := testEq(demarshalledConn, realConn)
+	fmt.Println("demarshalled connection: ", demarshalledConn)
+	sentCorrectly := realConn == demarshalledConn
+	if !sentCorrectly {
+		t.Error("Expected,", realConn, "Got", demarshalledConn)
+	} else {
+		fmt.Println("TestShouldReadMarshalledConn passed")
 	}
 }
 
@@ -58,9 +77,10 @@ func TestShouldMarshalTransactionCorrectly(t *testing.T) {
 	peer1 := peerFixture()
 
 	transaction := MakeTransaction("1234", "Mathias", "Rasmus", 100)
-
+	fmt.Println("Marshalling this transaction: ", transaction)
 	marshalled := peer1.MarshalTransaction(*transaction)
 	demarshalled := peer1.DemarshalTransaction(marshalled)
+	fmt.Println("Getting this demarshalled thing back:", demarshalled)
 	if (*transaction) != demarshalled {
 		t.Error("")
 	} else if demarshalled.Amount != 100 {
