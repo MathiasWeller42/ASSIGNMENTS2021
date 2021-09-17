@@ -66,3 +66,16 @@ func TestShouldMoveMoneyFromAccountToAccountOnTransaction(t *testing.T) {
 		fmt.Println("Ledger test TestShouldMoveMoneyFromAccountToAccountOnTransaction passed")
 	}
 }
+
+func TestShouldMoveMoneyOnNewAccounts(t *testing.T) {
+	ledger := MakeLedger()
+	transaction := MakeTransaction("transID", "acc1", "acc2", 100)
+	ledger.Transaction(transaction)
+	accountBalancesCorrect := ledger.Accounts["acc1"] == -100 && ledger.Accounts["acc2"] == 100
+
+	if !accountBalancesCorrect {
+		t.Errorf("Account balances should be correct")
+	} else {
+		fmt.Println("Ledger test TestShouldMoveMoneyOnNewAccounts passed")
+	}
+}
