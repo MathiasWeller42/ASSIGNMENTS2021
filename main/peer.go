@@ -12,6 +12,8 @@ import (
 type Connections = []net.Conn            //storing all peer connections
 type MessagesSent = map[Transaction]bool //storing the messages sent
 
+type ConnectionsURI = []string
+
 type Peer struct {
 	outbound               chan Transaction //The channel used to handle incoming messages, funelling them to a separate method to handle broadcast and printing
 	messagesSent           MessagesSent     //Map of the messages this peer has already sent and printed to user
@@ -25,6 +27,8 @@ type Peer struct {
 	port                   string //outbound port (for taking new connections)
 	ip                     string //outbound ip
 	ledger                 *Ledger
+
+	ConnectionsURI ConnectionsURI
 }
 
 func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrategy, message MessageSendingStrategy) *Peer {
@@ -87,7 +91,7 @@ func (peer *Peer) TakeNewConnection(listener net.Listener) {
 		panic(-1)
 	}
 	//add the new connection to connections
-	fmt.Println("Adding this connections to slice:", in_conn)
+	fmt.Println("Adding this connection to slice:", in_conn)
 	peer.AppendToConnections(in_conn)
 	peer.SendConnections(in_conn)
 	//handle input from the new connection and send all previous messages to new

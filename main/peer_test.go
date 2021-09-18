@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -27,11 +28,15 @@ func TestShouldReadMarshalledConn(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	realConn := peer1.Connections[0]
 	fmt.Println("Testing on this array:", realConn, "with length: , len(realConn)")
+	fmt.Println("This is the type of the conn object: ", reflect.TypeOf(realConn))
+	thestring := realConn.RemoteAddr().String()
+	fmt.Println("This is the remoteAddr: ", thestring)
 	marshalledConn := peer1.MarshalConnections1(realConn)
 	demarshalledConn := peer1.DemarshalConnections1(marshalledConn)
 	//sentCorrectly := testEq(demarshalledConn, realConn)
 	fmt.Println("demarshalled connection: ", demarshalledConn)
-	sentCorrectly := realConn == demarshalledConn
+	//sentCorrectly := realConn == demarshalledConn
+	sentCorrectly := realConn.RemoteAddr() == demarshalledConn.RemoteAddr()
 	if !sentCorrectly {
 		t.Error("Expected,", realConn, "Got", demarshalledConn)
 	} else {
