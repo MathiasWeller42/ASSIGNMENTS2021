@@ -74,7 +74,7 @@ func (peer *Peer) run() {
 	defer listener.Close()
 
 	//broadcast new presence in network
-	//peer.AddSelfToConnectionsURI()
+	peer.AddSelfToConnectionsURI()
 	//peer.BroadcastPresence() //broadcast own presence!!!
 
 	//take input from the user
@@ -100,8 +100,7 @@ func (peer *Peer) TakeNewConnection(listener net.Listener) {
 	//add the new connection to connections
 	fmt.Println("Adding this connection to slice:", in_conn.RemoteAddr().String())
 	peer.AppendToConnections(in_conn)
-	//time.Sleep(1 * time.Second) //!!! trying to allow other connection time to catch up
-	//peer.SendConnectionsURI(in_conn)
+	peer.SendConnectionsURI(in_conn)
 
 	//handle input from the new connection and send all previous messages to new
 	go peer.HandleIncomingFromPeer(in_conn)
@@ -134,16 +133,16 @@ func (peer *Peer) JoinNetwork(uri string) net.Conn {
 		return nil
 	} else {
 		fmt.Println("Connected to peer in network, you can now send and receive from the network")
-		peer.AppendToConnections(out_conn) //!!!should this be here? - tjek opgavebeskrivelse
+		//peer.AppendToConnections(out_conn) //!!!should this be here? - tjek opgavebeskrivelse
 
-		/*peer.connectionsURIMutex.Lock()
+		peer.connectionsURIMutex.Lock()
 		peer.connectionsURI = peer.ReceiveConnectionsURI(out_conn)
 		peer.connectionsURIMutex.Unlock()
-		fmt.Println("Received connectionsURI")*/
+		fmt.Println("Received connectionsURI")
 
-		//peer.ConnectToFirst10PeersInConnectionsURI(peer.connectionsURI)
+		peer.ConnectToFirst10PeersInConnectionsURI(peer.connectionsURI)
 
-		go peer.HandleIncomingFromPeer(out_conn) //!!!same as above - should this be here?
+		//go peer.HandleIncomingFromPeer(out_conn) //!!!same as above - should this be here?
 		return out_conn
 	}
 }
@@ -321,15 +320,19 @@ func (peer *Peer) MarshalTransaction(transaction Transaction) []byte {
 	if err != nil {
 		fmt.Println("Marshaling transaction failed")
 	}
+	//add extra ']' as delimiter
+	bytes = append(bytes, ']')
 	return bytes
 }
 
 func (peer *Peer) DemarshalTransaction(bytes []byte) (Transaction, error) {
 	var transaction Transaction
-	fmt.Println("Trying to demarshal this transaction:", bytes)
+	//delete the extra ']'
+	bytes = bytes[:len(bytes)-1]
+	fmt.Println("Trying to demarshal this transaction:", string(bytes))
 	err := json.Unmarshal(bytes, &transaction)
 	if err != nil {
-		fmt.Println("Demarshaling transaction failed")
+		fmt.Println("Demarshaling transaction failed", err)
 	}
 	return transaction, err
 }
