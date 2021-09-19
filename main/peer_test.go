@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
-	"reflect"
+	"net"
 	"testing"
 	"time"
 )
 
 func TestShouldReadMarshalledValuesCorrectlyFromConn(t *testing.T) {
-	peer1, _ := connectTwoPeers(t)
+	peer1, _, listener, listener2 := connectTwoPeers(t)
+	defer listener.Close()
+	defer listener2.Close()
 	time.Sleep(1 * time.Second)
 	realConn := peer1.connectionsURI
 	fmt.Println("Testing on this array:", realConn, "with length: ", len(realConn))
@@ -24,7 +26,9 @@ func TestShouldReadMarshalledValuesCorrectlyFromConn(t *testing.T) {
 	}
 }
 func TestShouldMarshalConnectionsURIOverNetWork(t *testing.T) {
-	peer1, peer2 := connectTwoPeers(t)
+	peer1, peer2, listener, listener2 := connectTwoPeers(t)
+	defer listener.Close()
+	defer listener2.Close()
 	time.Sleep(1 * time.Second)
 	realConn := peer1.connectionsURI
 	fmt.Println("Testing on this array:", realConn, "with length: ", len(realConn))
@@ -38,6 +42,7 @@ func TestShouldMarshalConnectionsURIOverNetWork(t *testing.T) {
 	}
 }
 
+/*
 func TestShouldReadMarshalledConn(t *testing.T) {
 	peer1, _ := connectTwoPeers(t)
 	time.Sleep(1 * time.Second)
@@ -59,7 +64,7 @@ func TestShouldReadMarshalledConn(t *testing.T) {
 		fmt.Println("TestShouldReadMarshalledConn passed")
 	}
 }
-
+*/
 func TestShouldMarshalConnectionsCorrectly(t *testing.T) {
 	/*peer1, _ := connectTwoPeers(t)
 	realConn := peer1.GetConnections()*/
@@ -80,7 +85,7 @@ func TestShouldMarshalConnectionsCorrectly(t *testing.T) {
 
 func TestPeerUpdateLedgerShouldUpdateWithTransaction(t *testing.T) {
 	peer := peerFixture()
-	transaction := MakeTransaction("transID", "acc1", "acc2", 100)
+	transaction := MakeTransaction("acc1", "acc2", 100)
 	peer.ledger.Accounts["acc1"] = 200
 	peer.ledger.Accounts["acc2"] = 200
 	peer.UpdateLedger(transaction)
@@ -97,7 +102,7 @@ func TestPeerUpdateLedgerShouldUpdateWithTransaction(t *testing.T) {
 func TestShouldMarshalTransactionCorrectly(t *testing.T) {
 	peer1 := peerFixture()
 
-	transaction := MakeTransaction("1234", "Mathias", "Rasmus", 100)
+	transaction := MakeTransaction("Mathias", "Rasmus", 100)
 	fmt.Println("Marshalling this transaction: ", transaction)
 	marshalled := peer1.MarshalTransaction(*transaction)
 	fmt.Println("This is marshalled:", marshalled)
@@ -113,116 +118,25 @@ func TestShouldMarshalTransactionCorrectly(t *testing.T) {
 	}
 }
 
-/*
-func TestShouldSendMessage(t *testing.T) {
-	msg := "testbesked"
-
-	fixedUriStrategy := MakeFixedUriStrategy("123", "123")
-	fixedInputStrategy := MakeFixedInputStrategy(msg)
-	fixedOutboundIPStrategy := MakeFixedOutboundIPStrategy("localhost")
-	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
-
-	peer1 := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
-
-	go peer1.HandleIncomingFromUser()
-	go peer1.SendMessages()
-	time.Sleep(2 * time.Second)
-	if !messageSendingStrategy.messagesSent[msg] {
-		t.Error("Message was not present in map")
-	} else if len(messageSendingStrategy.messagesSent) < 1 {
-		t.Errorf("No messages in map")
-	} else {
-		fmt.Println("Test 0 passed")
-	}
-
-}
-
-func TestShouldReturnCorrectURI(t *testing.T) {
-	fixedUriStrategy := MakeFixedUriStrategy("123", "123")
-	fixedInputStrategy := MakeFixedInputStrategy("")
-	fixedOutboundIPStrategy := MakeFixedOutboundIPStrategy("localhost")
-	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
-	peer1 := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
-
-	uri := peer1.GetURI()
-	if uri != "123:123" {
-		t.Errorf("The uri was not correct")
-	} else {
-		fmt.Println("Test 1 passed")
-	}
-}
-
-func TestShouldMakeNewNetworkOnInvalidIP(t *testing.T) {
-	fixedUriStrategy := MakeFixedUriStrategy("123", "123")
-	fixedInputStrategy := MakeFixedInputStrategy("")
-	fixedOutboundIPStrategy := MakeFixedOutboundIPStrategy("localhost")
-	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
-	peer1 := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
-
-	out_conn := peer1.ConnectToNetwork(peer1.GetURI())
-	if len(peer1.connections) != 0 {
-		t.Errorf("Network too large, should have been 0")
-	}
-	if out_conn != nil {
-		t.Errorf("Connected to a network when it should not have")
-	} else {
-		fmt.Println("Test 2 passed.")
-	}
-}
-
-func TestShouldStartListeningSuccessfully(t *testing.T) {
-	fixedUriStrategy := MakeFixedUriStrategy("123", "123")
-	fixedInputStrategy := MakeFixedInputStrategy("")
-	fixedOutboundIPStrategy := MakeFixedOutboundIPStrategy("localhost")
-	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
-	peer1 := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
-	listener := peer1.StartListeningForConnections()
+func TestConnurishouldhavelen10after10peers(t *testing.T) {
+	peer1, _, listener, listener2 := connectTwoPeers(t)
 	defer listener.Close()
-
-	if peer1.ip != "localhost" {
-		t.Errorf("Wrong outbound IP")
+	defer listener2.Close()
+	for i := 0; i < 9; i++ {
+		go connectNewPeer(peer1, t)
 	}
-	intval, _ := strconv.Atoi(peer1.port)
-	if intval < 0 || intval > 65535 {
-		t.Errorf("Illegal port")
+	time.Sleep(4 * time.Second)
+	conns := peer1.connectionsURI
+
+	if len(conns) == 10 {
+		fmt.Println("Test passed")
 	} else {
-		fmt.Println("Test 3 passed")
+		t.Error("Not all peers are added to conn uri, list has length:", len(conns))
 	}
 }
 
-func TestShouldConnectToExistingNetwork(t *testing.T) {
-	fixedUriStrategy1 := MakeFixedUriStrategy("123", "123")
-	fixedInputStrategy := MakeFixedInputStrategy("")
-	realOutboundIPStrategy := new(RealOutboundIPStrategy)
-	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
-	peer1 := MakePeer(fixedUriStrategy1, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
-
-	peer1.ConnectToNetwork(peer1.GetURI())
-	listener := peer1.StartListeningForConnections()
-	defer listener.Close()
-	go peer1.TakeNewConnection(listener)
-
-	fixedUriStrategy2 := MakeFixedUriStrategy(peer1.ip, peer1.port)
-	peer2 := MakePeer(fixedUriStrategy2, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
-
-	out_conn := peer2.ConnectToNetwork(peer2.GetURI())
-
-	if out_conn == nil {
-		t.Errorf("Connection did not work")
-	}
-	defer out_conn.Close()
-	time.Sleep(time.Second)
-	if len(peer1.connections) != 1 {
-		t.Errorf("Peer1's network should include peer2")
-	} else if len(peer2.connections) != 1 {
-		t.Errorf("Peer2's network should include peer1")
-	} else {
-		fmt.Println("Test 4 passed.")
-	}
-}
-*/
 func peerFixture() *Peer {
-	transaction := MakeTransaction("id", "acc1", "acc2", 100)
+	transaction := MakeTransaction("acc1", "acc2", 100)
 
 	fixedUriStrategy := MakeFixedUriStrategy("123", "123")
 	fixedInputStrategy := MakeFixedInputStrategy(*transaction)
@@ -231,11 +145,10 @@ func peerFixture() *Peer {
 
 	peer := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
 	return peer
-
 }
 
-func connectTwoPeers(t *testing.T) (*Peer, *Peer) {
-	transaction := MakeTransaction("id", "acc1", "acc2", 100)
+func connectTwoPeers(t *testing.T) (*Peer, *Peer, net.Listener, net.Listener) {
+	transaction := MakeTransaction("acc1", "acc2", 100)
 	fixedUriStrategy1 := MakeFixedUriStrategy("123", "123")
 	fixedInputStrategy := MakeFixedInputStrategy(*transaction)
 	realOutboundIPStrategy := new(RealOutboundIPStrategy)
@@ -244,28 +157,48 @@ func connectTwoPeers(t *testing.T) (*Peer, *Peer) {
 
 	peer1.JoinNetwork(peer1.GetURI())
 	listener := peer1.StartListeningForConnections()
-	defer listener.Close()
+	//defer listener.Close()
 	go peer1.TakeNewConnection(listener)
 
 	fixedUriStrategy2 := MakeFixedUriStrategy(peer1.ip, peer1.port)
 	peer2 := MakePeer(fixedUriStrategy2, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
 
 	peer2.JoinNetwork(peer2.GetURI())
+	listener2 := peer2.StartListeningForConnections()
+	defer listener2.Close()
+	go peer2.TakeNewConnection(listener)
 
-	return peer1, peer2
+	uri1 := peer1.GetURI()
+	peer1.AddSelfToConnectionsURI()
+	peer1.BroadcastPresence(uri1)
+
+	uri2 := peer2.GetURI()
+	peer2.AddSelfToConnectionsURI()
+	peer2.BroadcastPresence(uri2)
+
+	return peer1, peer2, listener, listener2
 
 }
 
-func connectNewPeer(peer *Peer, t *testing.T) *Peer {
-	transaction := MakeTransaction("id", "acc1", "acc2", 100)
+func connectNewPeer(peer *Peer, t *testing.T) {
+	transaction := MakeTransaction("acc1", "acc2", 100)
 	fixedUriStrategy1 := MakeFixedUriStrategy(peer.ip, peer.port)
 	fixedInputStrategy := MakeFixedInputStrategy(*transaction)
 	realOutboundIPStrategy := new(RealOutboundIPStrategy)
 	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
 	newPeer := MakePeer(fixedUriStrategy1, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
 	newPeer.JoinNetwork(newPeer.GetURI())
+	listener := newPeer.StartListeningForConnections()
+	defer listener.Close()
+	go newPeer.TakeNewConnection(listener)
 
-	return newPeer
+	uri := newPeer.GetURI()
+	newPeer.AddSelfToConnectionsURI()
+	newPeer.BroadcastPresence(uri)
+	for {
+		go newPeer.TakeNewConnection(listener)
+	}
+
 }
 
 func testEq(a, b []string) bool {

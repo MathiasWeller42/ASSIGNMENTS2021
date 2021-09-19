@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 )
 
-//!!! refactor connections to be list
 type Connections = []net.Conn            //storing all peer connections
 type MessagesSent = map[Transaction]bool //storing the messages sent
 
@@ -27,12 +27,12 @@ type Peer struct {
 	port                   string //outbound port (for taking new connections)
 	ip                     string //outbound ip
 	ledger                 *Ledger
-	connectionsURI         ConnectionsURI
-	connectionsURIMutex    *sync.Mutex
+	connectionsURI         ConnectionsURI //Holds the URIs of all peers currently present in the network.
+	connectionsURIMutex    *sync.Mutex    //Mutex for connectionsURI
 }
 
 func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrategy, message MessageSendingStrategy) *Peer {
-	//initialize message channel, message map, connections map and connections mutex
+	//Initialize all fields
 	peer := new(Peer)
 	peer.outbound = make(chan Transaction)
 	peer.connectionsMutex = &sync.Mutex{}
@@ -61,23 +61,23 @@ func main() {
 
 func (peer *Peer) run() {
 	//ask for IP and port of an existing peer
-	uri := peer.GetURI()
+	otherURI := peer.GetURI()
 
 	//connect to the given IP and port via TCP
-	out_conn := peer.JoinNetwork(uri)
-	if out_conn != nil {
-		defer out_conn.Close()
-	}
+	peer.JoinNetwork(otherURI)
 
 	//print own IP and port
 	listener := peer.StartListeningForConnections()
 	defer listener.Close()
 
-	//broadcast new presence in network
+	//add yourself to connectionsURI
 	peer.AddSelfToConnectionsURI()
-	//peer.BroadcastPresence() //broadcast own presence!!!
 
-	//take input from the user
+	//broadcast new presence in network so everyone can add you to connectionsURI
+	ownURI := peer.ip + ":" + peer.port
+	peer.BroadcastPresence(ownURI)
+
+	//take input from the user (for testing purposes)
 	go peer.HandleIncomingFromUser()
 
 	//set up a thread to send outbound messages
@@ -98,13 +98,30 @@ func (peer *Peer) TakeNewConnection(listener net.Listener) {
 	}
 
 	//add the new connection to connections
-	fmt.Println("Adding this connection to slice:", in_conn.RemoteAddr().String())
+	//the other may or may not listen, but we do not know, so we add it to be sure
 	peer.AppendToConnections(in_conn)
+
+	//send own connectionsURI in case the new peer is brand new
 	peer.SendConnectionsURI(in_conn)
 
 	//handle input from the new connection and send all previous messages to new
-	go peer.HandleIncomingFromPeer(in_conn)
-	//go peer.SendAllPreviousMessagesToPeer(in_conn)
+	go peer.HandleIncomingMessagesFromPeer(in_conn)
+}
+
+func (peer *Peer) BroadcastPresence(uri string) {
+	//add a delimiter to make it easier to read on the other side
+	uriToSend := uri + "uri]"
+	peer.connectionsMutex.Lock()
+	defer peer.connectionsMutex.Unlock()
+
+	//send the presence to all connections
+	for _, conn := range peer.connections {
+		_, err := fmt.Fprint(conn, uriToSend)
+		if err != nil {
+			//delete the missing connection
+			peer.DeleteFromConnections(conn)
+		}
+	}
 }
 
 func (peer *Peer) GetURI() string {
@@ -124,48 +141,43 @@ func (peer *Peer) StartListeningForConnections() net.Listener {
 	return listener
 }
 
-func (peer *Peer) JoinNetwork(uri string) net.Conn {
+func (peer *Peer) JoinNetwork(uri string) {
 	//connect to the given uri via TCP
 	fmt.Println("Connecting to uri: ", uri)
 	out_conn, err := net.Dial("tcp", uri)
 	if err != nil {
 		fmt.Println("No peer found, starting new  peer to peer network")
-		return nil
+		return
 	} else {
-		fmt.Println("Connected to peer in network, you can now send and receive from the network")
-		//peer.AppendToConnections(out_conn) //!!!should this be here? - tjek opgavebeskrivelse
-
+		//receive the peer's connectionsURI list before anything else
 		peer.connectionsURIMutex.Lock()
 		peer.connectionsURI = peer.ReceiveConnectionsURI(out_conn)
 		peer.connectionsURIMutex.Unlock()
 		fmt.Println("Received connectionsURI")
 
+		//connect to the 10 peers before yourself in the list
 		peer.ConnectToFirst10PeersInConnectionsURI(peer.connectionsURI)
 
-		//go peer.HandleIncomingFromPeer(out_conn) //!!!same as above - should this be here?
-		return out_conn
 	}
 }
 
 func (peer *Peer) ConnectToPeer(uri string) {
 	out_conn, err := net.Dial("tcp", uri)
 	if err != nil {
-		fmt.Println("No peer found on uri: ", uri)
+		return
 	} else {
 		peer.AppendToConnections(out_conn)
-		go peer.HandleIncomingFromPeer(out_conn)
+		go peer.HandleIncomingMessagesFromPeer(out_conn)
 	}
 }
 
 func (peer *Peer) ReceiveConnectionsURI(coming_from net.Conn) ConnectionsURI {
 	reader := bufio.NewReader(coming_from)
-	marshalled, err := reader.ReadBytes(']') //!!! Correct delimiter (this seems to be correct)
-	fmt.Println("Received the still marshalled connections list:", marshalled, " now calling demarshal:")
+	marshalled, err := reader.ReadBytes(']')
 	if err != nil {
 		fmt.Println("Lost connection to Peer")
 		panic(-1)
 	}
-	fmt.Println("Received connections")
 	connectionsURI := peer.DemarshalConnectionsURI(marshalled)
 	return connectionsURI
 }
@@ -183,28 +195,17 @@ func (peer *Peer) ConnectToFirst10PeersInConnectionsURI(connectionsURI Connectio
 	}
 }
 
-func (peer *Peer) SendAllPreviousMessagesToPeer(conn net.Conn) {
-	//send all old messages in the messagesSent map to a new connection
-	peer.messagesSentMutex.Lock()
-	defer peer.messagesSentMutex.Unlock()
-	fmt.Println("Sending this many previous messages to new peer:", len(peer.messagesSent))
-	i := 0
-	for message := range peer.messagesSent {
-		fmt.Println("Sending message number ", i)
-		i++
-		peer.SendMessage(conn, message)
-	}
-}
-
 func (peer *Peer) SendMessages() {
 	for {
 		//get a message from the channel and check if it has been sent before
 		message := <-peer.outbound
 		peer.messagesSentMutex.Lock()
 		if !peer.messagesSent[message] {
-			//if this message has not been sent before, print it to the user
+			//if this message has not been sent before, print it to the user (for testing purposes) and update ledger
 			fmt.Println("Message put in ledger and sent: ", message)
 			peer.UpdateLedger(&message) //Update ledger
+			//print the ledger for manual testing purposes
+			peer.ledger.Print()
 			peer.messagesSent[message] = true
 			peer.messagesSentMutex.Unlock()
 			//send the message out to all peers in the network
@@ -217,7 +218,6 @@ func (peer *Peer) SendMessages() {
 
 func (peer *Peer) SendMessage(connection net.Conn, message Transaction) {
 	//send the message to the connection
-	fmt.Println("Sending this message:", message, "To this:", connection.RemoteAddr().String())
 	marshalled := peer.MarshalTransaction(message)
 	_, err := connection.Write(marshalled)
 	if err != nil {
@@ -228,10 +228,8 @@ func (peer *Peer) SendMessage(connection net.Conn, message Transaction) {
 }
 
 func (peer *Peer) SendConnectionsURI(conn net.Conn) {
-	fmt.Println("Now marshalling this connections array: ", peer.connections, "and sending to ", conn.RemoteAddr().String())
 	marshalled := peer.MarshalConnectionsURI(peer.connectionsURI)
 	_, err := conn.Write(marshalled)
-	fmt.Println("Sent", len(peer.connectionsURI), " connections to new peer")
 	if err != nil {
 		fmt.Println("Tried to send to a lost connection")
 		//delete the missing connection
@@ -245,10 +243,26 @@ func (peer *Peer) AppendToConnections(conn net.Conn) {
 	peer.connectionsMutex.Unlock()
 }
 
-func (peer *Peer) AppendToConnectionsURI(uri string) {
+func (peer *Peer) AppendToConnectionsURI(uri string) bool {
 	peer.connectionsURIMutex.Lock()
-	peer.connectionsURI = append(peer.connectionsURI, uri)
-	peer.connectionsURIMutex.Unlock()
+	defer peer.connectionsURIMutex.Unlock()
+	//only add to connectionsURI if the URI is not already in there
+	shouldAdd := !peer.contains(peer.connectionsURI, uri)
+	if shouldAdd {
+		peer.connectionsURI = append(peer.connectionsURI, uri)
+	}
+	//for broadcasting presence we need to know whether it was new or not
+	return shouldAdd
+}
+
+//taken from StackOverflow https://stackoverflow.com/questions/10485743/contains-method-for-a-slice
+func (peer *Peer) contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 func (peer *Peer) DeleteFromConnections(conn net.Conn) {
@@ -281,29 +295,40 @@ func (peer *Peer) RemoveURI(slice []string, s int) []string {
 	return append(slice[:s], slice[s+1:]...)
 }
 
-func (peer *Peer) HandleIncomingFromUser() { //!!! not necessary any longer, except for testing
-	// kinda still necessary though, we haven't refactored enough yet...
+//only used for manual testing
+func (peer *Peer) HandleIncomingFromUser() {
 	for {
 		msg := peer.userInputStrategy.HandleIncomingFromUser()
 		peer.outbound <- msg
 	}
 }
 
-func (peer *Peer) HandleIncomingFromPeer(connection net.Conn) {
+func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 	defer connection.Close()
 	//take messages from the peer
 	reader := bufio.NewReader(connection)
 	for {
-		fmt.Println("Waiting for input...")
-		marshalled, err := reader.ReadBytes(']') //!!! Delim
+		marshalled, err := reader.ReadBytes(']')
 		if err != nil {
 			fmt.Println("Lost connection to peer")
 			return
 		}
-		fmt.Println("Got input, demarshalling")
 		msg, err := peer.DemarshalTransaction(marshalled)
 		if err != nil {
-			fmt.Println("Tried to demarshall something that was not a transaction, ignoring")
+			//Tried to demarshall something that was not a transaction, trying to read as it as a presence (URI)
+			asString := string(marshalled)
+			if strings.Contains(asString, "uri]") {
+				//it is not a transaction, but a URI presence
+				uriString := asString[:len(asString)-4]
+				//add it to connectionsURI and if it was new, keep broadcasting
+				continueBroadcasting := peer.AppendToConnectionsURI(uriString)
+				fmt.Println("Added new URI, list now has length:", len(peer.connectionsURI))
+				if continueBroadcasting {
+					peer.BroadcastPresence(uriString)
+				}
+			} else {
+				//This was a connectionsURI list so ignore it
+			}
 		} else {
 			//add message to channel
 			peer.outbound <- msg
@@ -329,17 +354,12 @@ func (peer *Peer) DemarshalTransaction(bytes []byte) (Transaction, error) {
 	var transaction Transaction
 	//delete the extra ']'
 	bytes = bytes[:len(bytes)-1]
-	fmt.Println("Trying to demarshal this transaction:", string(bytes))
 	err := json.Unmarshal(bytes, &transaction)
-	if err != nil {
-		fmt.Println("Demarshaling transaction failed", err)
-	}
 	return transaction, err
 }
 
 func (peer *Peer) MarshalConnectionsURI(connectionsURI ConnectionsURI) []byte {
 	peer.connectionsURIMutex.Lock()
-	fmt.Println("Marshalling performed on this array:", connectionsURI, " end of array")
 	bytes, err := json.Marshal(connectionsURI)
 	peer.connectionsURIMutex.Unlock()
 	if err != nil {
@@ -362,28 +382,3 @@ func (peer *Peer) DemarshalConnectionsURI(bytes []byte) ConnectionsURI {
 func (peer *Peer) GetConnections() []net.Conn {
 	return peer.connections
 }
-
-//!!!should be removed
-/*
-func (peer *Peer) MarshalASingleConnection(connections net.Conn) []byte {
-	peer.connectionsMutex.Lock()
-	fmt.Println("Marshalling performed on this array: end of array")
-	bytes, err := json.Marshal(connections)
-	peer.connectionsMutex.Unlock()
-	if err != nil {
-		fmt.Println("Marshaling failed")
-	}
-	fmt.Println(bytes)
-	return bytes
-}
-
-func (peer *Peer) DemarshalASingleConnection(bytes []byte) net.Conn {
-	var connections net.Conn
-	err := json.Unmarshal(bytes, &connections)
-	if err != nil {
-		fmt.Println("Demarshaling failed", err)
-	}
-	fmt.Println(connections)
-	return connections
-}
-*/

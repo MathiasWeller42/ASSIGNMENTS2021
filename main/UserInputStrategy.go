@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type UserInputStrategy interface {
@@ -17,13 +18,7 @@ type CommandLineUserInputStrategy struct {
 func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Transaction {
 
 	//prompt user to type a message
-	fmt.Println("Type an ID:")
 	reader := bufio.NewReader(os.Stdin)
-	id, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("User quit the program")
-		os.Exit(0)
-	}
 	fmt.Println("Type account 1:")
 	acc1, err := reader.ReadString('\n')
 	if err != nil {
@@ -42,12 +37,14 @@ func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Tran
 		fmt.Println("User quit the program")
 		os.Exit(0)
 	}
-	val, err := strconv.Atoi(amount)
+	fmt.Println("The amount before conversion: ", amount)
+	trimmed := strings.TrimSpace(amount)
+	val, err := strconv.Atoi(trimmed)
 	if err != nil {
 		fmt.Println("Wrong conversion to int")
 		val = 123
 	}
-	return *MakeTransaction(id, acc1, acc2, val)
+	return *MakeTransaction(acc1, acc2, val)
 }
 
 type FixedInputStrategy struct {

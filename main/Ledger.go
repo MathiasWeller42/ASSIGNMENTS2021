@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -31,4 +32,14 @@ func (l *Ledger) Transaction(t *Transaction) {
 
 	l.Accounts[t.From] -= t.Amount
 	l.Accounts[t.To] += t.Amount
+}
+
+func (l *Ledger) Print() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	fmt.Println("Ledger state:")
+	for acc, balance := range l.Accounts {
+		fmt.Println("Account", acc, "has balance", balance)
+	}
 }
