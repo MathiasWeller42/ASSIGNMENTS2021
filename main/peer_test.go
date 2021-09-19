@@ -15,8 +15,8 @@ func TestShouldReadMarshalledValuesCorrectlyFromConn(t *testing.T) {
 	fmt.Println("Testing on this array:", realConn, "with length: ", len(realConn))
 	marshalledConn := peer1.MarshalConnections(realConn)
 	demarshalledConn := peer1.DemarshalConnections(marshalledConn)
-	sentCorrectly := testEq(demarshalledConn, realConn)
-	if !sentCorrectly {
+	marshalledCorrectly := testEq(demarshalledConn, realConn)
+	if !marshalledCorrectly {
 		t.Error("Expected,", realConn, "Got", demarshalledConn)
 	} else {
 		fmt.Println("TestShouldReadMarshalledValuesCorrectlyFromConn passed")
@@ -29,10 +29,10 @@ func TestShouldReadMarshalledConn(t *testing.T) {
 	realConn := peer1.Connections[0]
 	fmt.Println("Testing on this array:", realConn, "with length: , len(realConn)")
 	fmt.Println("This is the type of the conn object: ", reflect.TypeOf(realConn))
-	thestring := realConn.RemoteAddr().String()
-	fmt.Println("This is the remoteAddr: ", thestring)
-	marshalledConn := peer1.MarshalConnections1(realConn)
-	demarshalledConn := peer1.DemarshalConnections1(marshalledConn)
+	remoteAddressString := realConn.RemoteAddr().String()
+	fmt.Println("This is the remoteAddr: ", remoteAddressString)
+	marshalledConn := peer1.MarshalASingleConnection(realConn)
+	demarshalledConn := peer1.DemarshalASingleConnection(marshalledConn)
 	//sentCorrectly := testEq(demarshalledConn, realConn)
 	fmt.Println("demarshalled connection: ", demarshalledConn)
 	//sentCorrectly := realConn == demarshalledConn
@@ -225,7 +225,7 @@ func connectTwoPeers(t *testing.T) (*Peer, *Peer) {
 	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
 	peer1 := MakePeer(fixedUriStrategy1, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
 
-	peer1.ConnectToNetwork(peer1.GetURI())
+	peer1.ConnectToPeer(peer1.GetURI())
 	listener := peer1.StartListeningForConnections()
 	defer listener.Close()
 	go peer1.TakeNewConnection(listener)
@@ -233,7 +233,7 @@ func connectTwoPeers(t *testing.T) (*Peer, *Peer) {
 	fixedUriStrategy2 := MakeFixedUriStrategy(peer1.ip, peer1.port)
 	peer2 := MakePeer(fixedUriStrategy2, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
 
-	out_conn := peer2.ConnectToNetwork(peer2.GetURI())
+	out_conn := peer2.ConnectToPeer(peer2.GetURI())
 
 	if out_conn == nil {
 		t.Errorf("Connection did not work")
@@ -250,7 +250,7 @@ func connectNewPeer(peer *Peer, t *testing.T) *Peer {
 	realOutboundIPStrategy := new(RealOutboundIPStrategy)
 	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
 	newPeer := MakePeer(fixedUriStrategy1, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
-	out_conn := newPeer.ConnectToNetwork(newPeer.GetURI())
+	out_conn := newPeer.ConnectToPeer(newPeer.GetURI())
 
 	if out_conn == nil {
 		t.Errorf("Connection did not work")

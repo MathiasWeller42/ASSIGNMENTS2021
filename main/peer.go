@@ -28,7 +28,7 @@ type Peer struct {
 	ip                     string //outbound ip
 	ledger                 *Ledger
 
-	ConnectionsURI ConnectionsURI
+	ConnectionsURI ConnectionsURI // ?? hvorfor bliover connectionsURI ikke initialiseret i MakePeer?
 }
 
 func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrategy, message MessageSendingStrategy) *Peer {
@@ -62,7 +62,7 @@ func (peer *Peer) run() {
 	uri := peer.GetURI()
 
 	//connect to the given IP and port via TCP
-	out_conn := peer.ConnectToNetwork(uri)
+	out_conn := peer.ConnectToPeer(uri)
 	if out_conn != nil {
 		defer out_conn.Close()
 	}
@@ -96,7 +96,7 @@ func (peer *Peer) TakeNewConnection(listener net.Listener) {
 	peer.SendConnections(in_conn)
 	//handle input from the new connection and send all previous messages to new
 	go peer.HandleIncomingFromPeer(in_conn)
-	go peer.SendAllPrevious(in_conn)
+	go peer.SendAllPreviousMessagesToPeer(in_conn)
 }
 
 func (peer *Peer) GetURI() string {
@@ -112,7 +112,7 @@ func (peer *Peer) StartListeningForConnections() net.Listener {
 	return listener
 }
 
-func (peer *Peer) ConnectToNetwork(uri string) net.Conn {
+func (peer *Peer) ConnectToPeer(uri string) net.Conn {
 	//connect to the given uri via TCP
 	fmt.Println("Connecting to uri: ", uri)
 	out_conn, err := net.Dial("tcp", uri)
@@ -147,7 +147,7 @@ func (peer *Peer) ReceiveConnections(coming_from net.Conn) []net.Conn {
 	return connections
 }
 
-func (peer *Peer) SendAllPrevious(conn net.Conn) {
+func (peer *Peer) SendAllPreviousMessagesToPeer(conn net.Conn) {
 	//send all old messages in the messagesSent map to a new connection
 	peer.messagesSentMutex.Lock()
 	defer peer.messagesSentMutex.Unlock()
@@ -308,7 +308,7 @@ func (peer *Peer) GetConnections() []net.Conn {
 	return peer.Connections
 }
 
-func (peer *Peer) MarshalConnections1(connections net.Conn) []byte {
+func (peer *Peer) MarshalASingleConnection(connections net.Conn) []byte {
 	peer.connectionsMutex.Lock()
 	fmt.Println("Marshalling performed on this array: end of array")
 	bytes, err := json.Marshal(connections)
@@ -321,7 +321,7 @@ func (peer *Peer) MarshalConnections1(connections net.Conn) []byte {
 	return bytes
 }
 
-func (peer *Peer) DemarshalConnections1(bytes []byte) net.Conn {
+func (peer *Peer) DemarshalASingleConnection(bytes []byte) net.Conn {
 	var connections net.Conn
 	//bytes = append(bytes, "]"...)
 	err := json.Unmarshal(bytes, &connections)
