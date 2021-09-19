@@ -51,14 +51,14 @@ func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Tran
 }
 
 type FixedInputStrategy struct {
-	currentInput Transaction
+	currentInput string
 }
 
-func (inputStrategy *FixedInputStrategy) HandleIncomingFromUser() Transaction {
+func (inputStrategy *FixedInputStrategy) HandleIncomingFromUser() string {
 	return inputStrategy.currentInput
 }
 
-func MakeFixedInputStrategy(input Transaction) *FixedInputStrategy {
+func MakeFixedInputStrategy(input string) *FixedInputStrategy {
 	inputStrategy := new(FixedInputStrategy)
 	inputStrategy.currentInput = input
 	return inputStrategy
