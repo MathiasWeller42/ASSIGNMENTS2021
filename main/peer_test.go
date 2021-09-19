@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -11,10 +10,12 @@ import (
 func TestShouldReadMarshalledValuesCorrectlyFromConn(t *testing.T) {
 	peer1, _ := connectTwoPeers(t)
 	time.Sleep(1 * time.Second)
-	realConn := peer1.Connections
+	realConn := peer1.connectionsURI
 	fmt.Println("Testing on this array:", realConn, "with length: ", len(realConn))
-	marshalledConn := peer1.MarshalConnections(realConn)
-	demarshalledConn := peer1.DemarshalConnections(marshalledConn)
+	marshalledConn := peer1.MarshalConnectionsURI(realConn)
+	fmt.Println("Marshalled ConnectionsURI: ", marshalledConn)
+	demarshalledConn := peer1.DemarshalConnectionsURI(marshalledConn)
+	fmt.Println("Demarshalled ConnectionsURI: ", demarshalledConn)
 	marshalledCorrectly := testEq(demarshalledConn, realConn)
 	if !marshalledCorrectly {
 		t.Error("Expected,", realConn, "Got", demarshalledConn)
@@ -22,20 +23,35 @@ func TestShouldReadMarshalledValuesCorrectlyFromConn(t *testing.T) {
 		fmt.Println("TestShouldReadMarshalledValuesCorrectlyFromConn passed")
 	}
 }
+func TestShouldMarshalConnectionsURIOverNetWork(t *testing.T) {
+	peer1, peer2 := connectTwoPeers(t)
+	time.Sleep(1 * time.Second)
+	realConn := peer1.connectionsURI
+	fmt.Println("Testing on this array:", realConn, "with length: ", len(realConn))
+	demarshalledConn := peer2.connectionsURI
+	marshalledCorrectly := testEq(demarshalledConn, realConn)
+	fmt.Println("Peer1:", realConn, "Peer 2:", demarshalledConn)
+	if !marshalledCorrectly {
+		t.Error("Expected,", realConn, "Got", demarshalledConn)
+	} else {
+		fmt.Println("TestShouldMarshalConnectionsURIOverNetWork passed")
+	}
+}
 
 func TestShouldReadMarshalledConn(t *testing.T) {
 	peer1, _ := connectTwoPeers(t)
 	time.Sleep(1 * time.Second)
-	realConn := peer1.Connections[0]
+	realConn := peer1.connections[0]
+
 	fmt.Println("Testing on this array:", realConn, "with length: , len(realConn)")
 	fmt.Println("This is the type of the conn object: ", reflect.TypeOf(realConn))
 	remoteAddressString := realConn.RemoteAddr().String()
 	fmt.Println("This is the remoteAddr: ", remoteAddressString)
 	marshalledConn := peer1.MarshalASingleConnection(realConn)
 	demarshalledConn := peer1.DemarshalASingleConnection(marshalledConn)
-	//sentCorrectly := testEq(demarshalledConn, realConn)
+
 	fmt.Println("demarshalled connection: ", demarshalledConn)
-	//sentCorrectly := realConn == demarshalledConn
+
 	sentCorrectly := realConn.RemoteAddr() == demarshalledConn.RemoteAddr()
 	if !sentCorrectly {
 		t.Error("Expected,", realConn, "Got", demarshalledConn)
@@ -48,10 +64,10 @@ func TestShouldMarshalConnectionsCorrectly(t *testing.T) {
 	/*peer1, _ := connectTwoPeers(t)
 	realConn := peer1.GetConnections()*/
 	peer1 := peerFixture()
-	realConn := []net.Conn{nil, nil}
+	realConn := []string{"yo", "yo"}
 	fmt.Println("Realconn:", realConn, "End")
-	marshalledConn := peer1.MarshalConnections(realConn)
-	demarshalledConn := peer1.DemarshalConnections(marshalledConn)
+	marshalledConn := peer1.MarshalConnectionsURI(realConn)
+	demarshalledConn := peer1.DemarshalConnectionsURI(marshalledConn)
 	marshallingCorrect := testEq(realConn, demarshalledConn)
 	fmt.Println(realConn)
 	time.Sleep(1 * time.Second)
@@ -84,7 +100,8 @@ func TestShouldMarshalTransactionCorrectly(t *testing.T) {
 	transaction := MakeTransaction("1234", "Mathias", "Rasmus", 100)
 	fmt.Println("Marshalling this transaction: ", transaction)
 	marshalled := peer1.MarshalTransaction(*transaction)
-	demarshalled := peer1.DemarshalTransaction(marshalled)
+	fmt.Println("This is marshalled:", marshalled)
+	demarshalled, _ := peer1.DemarshalTransaction(marshalled)
 	fmt.Println("Getting this demarshalled thing back:", demarshalled)
 	if (*transaction) != demarshalled {
 		t.Error("")
@@ -143,7 +160,7 @@ func TestShouldMakeNewNetworkOnInvalidIP(t *testing.T) {
 	peer1 := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
 
 	out_conn := peer1.ConnectToNetwork(peer1.GetURI())
-	if len(peer1.Connections) != 0 {
+	if len(peer1.connections) != 0 {
 		t.Errorf("Network too large, should have been 0")
 	}
 	if out_conn != nil {
@@ -225,7 +242,7 @@ func connectTwoPeers(t *testing.T) (*Peer, *Peer) {
 	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
 	peer1 := MakePeer(fixedUriStrategy1, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
 
-	peer1.ConnectToPeer(peer1.GetURI())
+	peer1.JoinNetwork(peer1.GetURI())
 	listener := peer1.StartListeningForConnections()
 	defer listener.Close()
 	go peer1.TakeNewConnection(listener)
@@ -233,12 +250,8 @@ func connectTwoPeers(t *testing.T) (*Peer, *Peer) {
 	fixedUriStrategy2 := MakeFixedUriStrategy(peer1.ip, peer1.port)
 	peer2 := MakePeer(fixedUriStrategy2, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
 
-	out_conn := peer2.ConnectToPeer(peer2.GetURI())
+	peer2.JoinNetwork(peer2.GetURI())
 
-	if out_conn == nil {
-		t.Errorf("Connection did not work")
-	}
-	defer out_conn.Close()
 	return peer1, peer2
 
 }
@@ -250,16 +263,12 @@ func connectNewPeer(peer *Peer, t *testing.T) *Peer {
 	realOutboundIPStrategy := new(RealOutboundIPStrategy)
 	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
 	newPeer := MakePeer(fixedUriStrategy1, fixedInputStrategy, realOutboundIPStrategy, messageSendingStrategy)
-	out_conn := newPeer.ConnectToPeer(newPeer.GetURI())
+	newPeer.JoinNetwork(newPeer.GetURI())
 
-	if out_conn == nil {
-		t.Errorf("Connection did not work")
-	}
-	defer out_conn.Close()
 	return newPeer
 }
 
-func testEq(a, b []net.Conn) bool {
+func testEq(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
