@@ -117,21 +117,62 @@ func TestShouldMarshalTransactionCorrectly(t *testing.T) {
 		fmt.Println("Marshalling test passed")
 	}
 }
-
 func TestConnurishouldhavelen10after10peers(t *testing.T) {
-	peer1, _, listener, listener2 := connectTwoPeers(t)
-	defer listener.Close()
-	defer listener2.Close()
+	peer1, listener1 := createPeer("fa", "fa")
+	defer listener1.Close()
+
 	for i := 0; i < 9; i++ {
-		go connectNewPeer(peer1, t)
+		_, listener := createPeer(peer1.ip, peer1.port)
+		defer listener.Close()
 	}
-	time.Sleep(4 * time.Second)
+
+	time.Sleep(2 * time.Second)
 	conns := peer1.connectionsURI
 
 	if len(conns) == 10 {
-		fmt.Println("Test passed")
+		fmt.Println("Test passed with conns:", conns)
 	} else {
 		t.Error("Not all peers are added to conn uri, list has length:", len(conns))
+	}
+}
+
+func TestConnuriANDConnsshouldhavelen10after10peers(t *testing.T) {
+	peer1, listener1 := createPeer("fa", "fa")
+	defer listener1.Close()
+
+	for i := 0; i < 9; i++ {
+		_, listener := createPeer(peer1.ip, peer1.port)
+		defer listener.Close()
+	}
+
+	time.Sleep(2 * time.Second)
+	conns := peer1.connectionsURI
+	conns2 := peer1.connections
+
+	if len(conns) == 10 && len(conns2) >= 10 {
+		fmt.Println("Test passed, both have at least length 10")
+	} else {
+		t.Error("Not all peers are added to either conn uri or conn, lists have length:", len(conns), "and ", len(conns2))
+	}
+}
+
+func TestShouldOnlyConnectTo10lastConnURI(t *testing.T) {
+	peer1, listener1 := createPeer("fa", "fa")
+	defer listener1.Close()
+
+	for i := 0; i < 12; i++ {
+		_, listener := createPeer(peer1.ip, peer1.port)
+		defer listener.Close()
+	}
+
+	time.Sleep(2 * time.Second)
+	conns := peer1.connectionsURI
+	conns2 := peer1.connections
+	//Conns2 should be 22, 12 peers connected to it, it connected to 10 peers.
+	if len(conns) == 13 && len(conns2) == 22 {
+		fmt.Println("Test passed, both have at least length 10")
+	} else {
+		t.Error("Not all peers are added to either conn uri or conn, lists have length:", len(conns), "and ", len(conns2))
 	}
 }
 
@@ -211,4 +252,38 @@ func testEq(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func createPeer(ip string, port string) (*Peer, net.Listener) {
+	transaction := MakeTransaction("acc1", "acc2", 100)
+
+	fixedUriStrategy := MakeFixedUriStrategy(ip, port)
+	fixedInputStrategy := MakeFixedInputStrategy(*transaction)
+	fixedOutboundIPStrategy := MakeFixedOutboundIPStrategy("localhost")
+	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
+	peer := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
+
+	uri := peer.GetURI()
+
+	peer.JoinNetwork(uri)
+
+	listener := peer.StartListeningForConnections()
+
+	peer.AddSelfToConnectionsURI()
+
+	ownURI := peer.ip + ":" + peer.port
+	peer.BroadcastPresence(ownURI)
+
+	//go peer.HandleIncomingFromUser()
+
+	go peer.SendMessages()
+	go takeNewConnectionsHelp(peer, listener)
+
+	return peer, listener
+}
+
+func takeNewConnectionsHelp(peer *Peer, listener net.Listener) {
+	for {
+		peer.TakeNewConnection(listener)
+	}
 }

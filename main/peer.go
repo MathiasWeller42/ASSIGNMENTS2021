@@ -60,20 +60,20 @@ func main() {
 }
 
 func (peer *Peer) run() {
-	//ask for IP and port of an existing peer
+	//ask for IP and port of an existing peer via user input or other strategy
 	otherURI := peer.GetURI()
 
 	//connect to the given IP and port via TCP
 	peer.JoinNetwork(otherURI)
 
-	//print own IP and port
+	//listen for connections on own ip and port to which other peers can connect, the listener object is passed to takeNewConnection
 	listener := peer.StartListeningForConnections()
 	defer listener.Close()
 
-	//add yourself to connectionsURI
+	//add yourself to end of connectionsURI list which was received in the joinNetwork call
 	peer.AddSelfToConnectionsURI()
 
-	//broadcast new presence in network so everyone can add you to connectionsURI
+	//broadcast new presence in network so everyone can append you to connectionsURI
 	ownURI := peer.ip + ":" + peer.port
 	peer.BroadcastPresence(ownURI)
 
@@ -166,6 +166,7 @@ func (peer *Peer) ConnectToPeer(uri string) {
 	if err != nil {
 		return
 	} else {
+		fmt.Println("Appending to connections")
 		peer.AppendToConnections(out_conn)
 		go peer.HandleIncomingMessagesFromPeer(out_conn)
 	}
