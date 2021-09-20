@@ -16,7 +16,7 @@ func TestShouldCreateLedger(t *testing.T) {
 }
 
 func TestShouldCreateTransaction(t *testing.T) {
-	transaction := MakeTransaction("id", "from", "to", 0)
+	transaction := MakeTransaction("from", "to", 0)
 
 	if transaction.ID != "id" {
 		t.Errorf("ID not initialized correctly")
@@ -56,7 +56,7 @@ func TestShouldMoveMoneyFromAccountToAccountOnTransaction(t *testing.T) {
 	ledger := MakeLedger()
 	ledger.Accounts["acc1"] = 200
 	ledger.Accounts["acc2"] = 200
-	transaction := MakeTransaction("transID", "acc1", "acc2", 100)
+	transaction := MakeTransaction("acc1", "acc2", 100)
 	ledger.Transaction(transaction)
 	accountBalancesCorrect := ledger.Accounts["acc1"] == 100 && ledger.Accounts["acc2"] == 300
 
@@ -69,7 +69,7 @@ func TestShouldMoveMoneyFromAccountToAccountOnTransaction(t *testing.T) {
 
 func TestShouldMoveMoneyOnNewAccounts(t *testing.T) {
 	ledger := MakeLedger()
-	transaction := MakeTransaction("transID", "acc1", "acc2", 100)
+	transaction := MakeTransaction("acc1", "acc2", 100)
 	ledger.Transaction(transaction)
 	accountBalancesCorrect := ledger.Accounts["acc1"] == -100 && ledger.Accounts["acc2"] == 100
 
