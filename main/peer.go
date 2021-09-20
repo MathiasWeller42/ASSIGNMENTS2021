@@ -64,8 +64,10 @@ func (peer *Peer) run() {
 	otherURI := peer.GetURI()
 
 	//connect to the given IP and port via TCP
-	peer.JoinNetwork(otherURI)
-
+	conn := peer.JoinNetwork(otherURI)
+	if conn != nil {
+		defer conn.Close()
+	}
 	//listen for connections on own ip and port to which other peers can connect, the listener object is passed to takeNewConnection
 	listener := peer.StartListeningForConnections()
 	defer listener.Close()
@@ -141,14 +143,15 @@ func (peer *Peer) StartListeningForConnections() net.Listener {
 	return listener
 }
 
-func (peer *Peer) JoinNetwork(uri string) {
+func (peer *Peer) JoinNetwork(uri string) net.Conn {
 	//connect to the given uri via TCP
 	fmt.Println("Connecting to uri: ", uri)
 	out_conn, err := net.Dial("tcp", uri)
 	if err != nil {
 		fmt.Println("No peer found, starting new  peer to peer network")
-		return
+		return nil
 	} else {
+		peer.AppendToConnections(out_conn)
 		//receive the peer's connectionsURI list before anything else
 		peer.connectionsURIMutex.Lock()
 		peer.connectionsURI = peer.ReceiveConnectionsURI(out_conn)
@@ -156,7 +159,8 @@ func (peer *Peer) JoinNetwork(uri string) {
 		fmt.Println("Received connectionsURI")
 
 		//connect to the 10 peers before yourself in the list
-		peer.ConnectToFirst10PeersInConnectionsURI(peer.connectionsURI)
+		peer.ConnectToFirst10PeersInConnectionsURI(peer.connectionsURI, uri)
+		return out_conn
 
 	}
 }
@@ -183,14 +187,16 @@ func (peer *Peer) ReceiveConnectionsURI(coming_from net.Conn) ConnectionsURI {
 	return connectionsURI
 }
 
-func (peer *Peer) ConnectToFirst10PeersInConnectionsURI(connectionsURI ConnectionsURI) {
+func (peer *Peer) ConnectToFirst10PeersInConnectionsURI(connectionsURI ConnectionsURI, olduri string) {
 	peer.connectionsURIMutex.Lock()
 	defer peer.connectionsURIMutex.Unlock()
 	index := len(connectionsURI) - 1
 	i := 0
 	for i < 10 && index >= 0 {
 		uri := connectionsURI[index]
-		peer.ConnectToPeer(uri)
+		if uri != olduri {
+			peer.ConnectToPeer(uri)
+		}
 		i++
 		index--
 	}
