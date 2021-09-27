@@ -66,9 +66,14 @@ func generateAESKey() []byte {
 }
 
 func main() {
+	fmt.Println("First we test RSA encryption on its own")
+	RunRSA()
+
+	fmt.Println("Now let's go to AES")
 	example := "Hej med dig, Simon :D"
 	runEncryption("example.txt", []byte(example), true)
 
+	fmt.Println("And finally let's encrypt/decrypt an RSA key (d)")
 	//encryption of RSA key (we only encrypt d, since e and n are publicly known)
 	d, n, e := GenerateRSAKeys()
 
@@ -83,13 +88,15 @@ func main() {
 	fmt.Println("The key after encrypt/decrypt:", dAsBigInt)
 
 	//an m to test the RSA key on
-	m := big.NewInt(12345)
+	test_m := 798493272
+	fmt.Println("We use the decrypted RSA key to encrypt the number", test_m)
+	m := big.NewInt(int64(test_m))
 	c := Encrypt(m, e, n)
 
 	//decrypting m with the encrypted/decrypted key d
 	p := Decrypt(&c, *dAsBigInt, n)
 
-	fmt.Println("These should be the same:", m, p)
+	fmt.Println("These should be the same (except for some formatting):", m, p)
 
 }
 

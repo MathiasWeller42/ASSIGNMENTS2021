@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"os"
 )
 
 var n big.Int
@@ -66,6 +68,7 @@ func GenerateRSAKeys() ([]byte, big.Int, *big.Int) {
 	return d.Bytes(), n, e
 }
 
+/*
 func primeTest(k int) {
 	prime, err := rand.Prime(rand.Reader, k/2)
 	if err != nil {
@@ -82,10 +85,9 @@ func primeTest(k int) {
 	} else {
 		fmt.Println("This ain't prime, y'all")
 	}
-}
+}*/
 
-/*
-func main() {
+func RunRSA() {
 	KeyGen(2048)
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Enter the integer to be encrypted:")
@@ -100,4 +102,3 @@ func main() {
 	decrypted := Decrypt(&encrypted, d, n)
 	fmt.Println("Decrypted:", decrypted)
 }
-*/
