@@ -26,6 +26,13 @@ def softmax(X):
     """
     res = np.zeros(X.shape)
     ### YOUR CODE HERE no for loops please
+    maxes = (np.amax(X, axis=1))[:, np.newaxis]
+    lessMax_X = X - maxes
+    exp_X = np.exp(lessMax_X)
+    sum_X = np.sum(exp_X, axis=1)[:, np.newaxis] #this is a column vector
+    log_X = np.log(sum_X) + maxes
+    res = X - log_X
+    res = np.exp(res)
     ### END CODE
     return res
 
@@ -114,12 +121,16 @@ class SoftmaxClassifier():
         Args:
            X: numpy array shape (n, d) - the data each row is a data point
         Returns
-           out: np.array shape (n, ) - prediction on each data point (number in 0,1,..., num_classes
+           out: np.array shape (n, ) - prediction on each data point (number in 0,1,..., num_classes)
         """
-        out = None
+        out = np.zeros(X.shape[0])
         ### YOUR CODE HERE - 1-4 lines
+        softmax_res = softmax(X @ self.W)   
+        maxes = np.amax(softmax_res, axis=1)[:, np.newaxis]
+        bools = np.equal(softmax_res, maxes)
+        res = np.where(maxes == softmax_res)[1]
         ### END CODE
-        return out
+        return res
 
 
 
@@ -163,4 +174,11 @@ def test_grad():
 if __name__ == "__main__":
     test_encoding()
     test_softmax()
-    test_grad()
+    #test_grad()
+    cl = SoftmaxClassifier(num_classes=2)
+    x = np.array([[2,1],[3,4],[4,5]])
+    cl.W = np.array([[1,1],[1,1]])
+    out = cl.predict(x)
+    print("out", out)
+    
+    

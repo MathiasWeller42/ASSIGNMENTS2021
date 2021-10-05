@@ -12,12 +12,22 @@ def logistic(z):
     Returns:
        logi: numpy array shape (d,) each entry transformed by the logistic function 
     """
-    logi = z.copy()
+    logi = np.zeros(z.shape)
     ### YOUR CODE HERE 1-5 lines
-    logi = 1 / (1 + np.exp(- logi))
+    logi = 1 / (1 + np.exp(- z))
     ### END CODE
     assert logi.shape == z.shape
     return logi
+
+def permute(X, y):
+    assert y.shape[0] == X.shape[0]
+    xy = np.hstack((X,y[:, np.newaxis]))
+    perm = np.random.permutation(xy)
+    perm_y = perm[:,-1]
+    perm_x = perm[:,:-1]
+    assert y.shape == perm_y.shape
+    assert X.shape == perm_x.shape
+    return perm_x, perm_y
 
 
 class LogisticRegressionClassifier():
@@ -40,21 +50,20 @@ class LogisticRegressionClassifier():
            cost: scalar: the average negative log likelihood for logistic regression with data X, y 
            grad: np.arrray shape(d, ) gradient of the average negative log likelihood at w 
         """
+        
         cost = 0
         grad = np.zeros(w.shape)
         ### YOUR CODE HERE 5 - 15 lines
         n = X.shape[0]
-        d = X.shape[1]
 
         cost_v = np.zeros(n)
-        yxw = y * (X @ w.T)
-        cost_v = -(yxw)
+        cost_v = -(y[:, np.newaxis] * (X @ w[:, np.newaxis]))
         cost_v = np.log(1 + np.exp(cost_v))
         cost = sum(cost_v) / n
 
-        grad = logistic(-(yxw))
-        grad = (-y) * X * grad
-
+        grad = logistic(-(y[:, np.newaxis] * (X @ w[:, np.newaxis])))
+        grad_m = (-y[:, np.newaxis]) * X * grad #grad_m is nxd matrix
+        grad = (np.sum(grad_m, axis=0) / n)
         ### END CODE
         assert grad.shape == w.shape
         return cost, grad
@@ -70,8 +79,8 @@ class LogisticRegressionClassifier():
         Remeber the stochastic nature of the algorithm may give fluctuations in the cost as iterations increase.
 
         Args:
-           X: np.array shape (n,d) dtype float32 - Features 
-           y: np.array shape (n,) dtype int32 - Labels 
+           X: np.array shape (n,d) dtype float32 - Features
+           y: np.array shape (n,) dtype int32 - Labels
            w: np.array shape (d,) dtype float32 - Initial parameter vector
            lr: scalar - learning rate for gradient descent
            batch_size: number of elements to use in minibatch
@@ -84,10 +93,26 @@ class LogisticRegressionClassifier():
         if w is None: w = np.zeros(X.shape[1])
         history = []        
         ### YOUR CODE HERE 14 - 20 lines
+        
+        for e in range(epochs):
+            perm_x, perm_y = permute(X, y)
+            #print("shape permx, permy:", perm_x.shape, perm_y.shape)
+            batchesX = [perm_x[i:i+batch_size] for i in range(0, len(perm_x), batch_size)]
+            batchesY = [perm_y[i:i+batch_size] for i in range(0, len(perm_y), batch_size)]
+            #OMGListsAreTheBest #Numpy4Life #I<3Python #LinearAlgebraAmirite 
+            #oh, nothing on that index? sure, all good, have a nice day!
+            latest_cost = 0
+            for j in range(len(batchesX)):
+                currentX = batchesX[j]
+                currentY = batchesY[j]
+                cost, grad = self.cost_grad(currentX, currentY, w)
+                latest_cost = cost
+                w = w - (lr * grad)
+            print("Cost in epoch", e, ":", latest_cost)
+            history.append(latest_cost)
         ### END CODE
         self.w = w
         self.history = history
-
 
     def predict(self, X):
         """ Classify each data element in X
@@ -101,13 +126,8 @@ class LogisticRegressionClassifier():
         """
         out = np.ones(X.shape[0])
         ### YOUR CODE HERE 1 - 4 lines
-        #self.w = np.array([1,1,1])
-
         out = logistic(X @ self.w.T)   
         out = [(-1 if i < 0.5 else 1) for i in out]
-
-        #out = np.sign(out - 0.5)
-        #out = out + (out == 0) 
         ### END CODE
         return out
     
@@ -185,10 +205,10 @@ def test_score():
 if __name__ == '__main__':
     test_logistic()
     test_predict()
-    test_score()
-    #test_cost()
-    #test_grad()
-    
+    test_score() 
+    test_cost()
+    test_grad()
+   
     
 
     
