@@ -12,8 +12,9 @@ def logistic(z):
     Returns:
        logi: numpy array shape (d,) each entry transformed by the logistic function 
     """
-    logi = np.zeros(z.shape)
+    logi = z.copy()
     ### YOUR CODE HERE 1-5 lines
+    logi = 1 / (1 + np.exp(- logi))
     ### END CODE
     assert logi.shape == z.shape
     return logi
@@ -42,6 +43,18 @@ class LogisticRegressionClassifier():
         cost = 0
         grad = np.zeros(w.shape)
         ### YOUR CODE HERE 5 - 15 lines
+        n = X.shape[0]
+        d = X.shape[1]
+
+        cost_v = np.zeros(n)
+        yxw = y * (X @ w.T)
+        cost_v = -(yxw)
+        cost_v = np.log(1 + np.exp(cost_v))
+        cost = sum(cost_v) / n
+
+        grad = logistic(-(yxw))
+        grad = (-y) * X * grad
+
         ### END CODE
         assert grad.shape == w.shape
         return cost, grad
@@ -88,6 +101,13 @@ class LogisticRegressionClassifier():
         """
         out = np.ones(X.shape[0])
         ### YOUR CODE HERE 1 - 4 lines
+        #self.w = np.array([1,1,1])
+
+        out = logistic(X @ self.w.T)   
+        out = [(-1 if i < 0.5 else 1) for i in out]
+
+        #out = np.sign(out - 0.5)
+        #out = out + (out == 0) 
         ### END CODE
         return out
     
@@ -99,11 +119,13 @@ class LogisticRegressionClassifier():
             y: np.array shape (n,) dtype int - Labels 
 
         Returns: 
-           s: float, number of correct prediction divivded by n.
+           s: float, number of correct prediction divided by n.
 
         """
         s = 0
         ### YOUR CODE HERE 1 - 4 lines
+        prediction = self.predict(X)
+        s = np.sum(prediction == y) / len(y)
         ### END CODE
         return s
         
@@ -115,7 +137,7 @@ def test_logistic():
     lg = logistic(a)
     target = np.array([ 0.5, 0.73105858, 0.88079708, 0.95257413])
     assert np.allclose(lg, target), 'Logistic Mismatch Expected {0} - Got {1}'.format(target, lg)
-    print('Test Success!')
+    print('Logistic Test Success')
 
     
 def test_cost():
@@ -128,7 +150,7 @@ def test_cost():
     cost,_ = lr.cost_grad(X, y, w)
     target = -np.log(0.5)
     assert np.allclose(cost, target), 'Cost Function Error:  Expected {0} - Got {1}'.format(target, cost)
-    print('Test Success')
+    print('Cost Test Success')
 
     
 def test_grad():
@@ -140,13 +162,35 @@ def test_grad():
     lr = LogisticRegressionClassifier()
     f = lambda z: lr.cost_grad(X, y, w=z)
     numerical_grad_check(f, w)
-    print('Test Success')
+    print('Grad Test Success')
 
+def test_predict():
+    lr = LogisticRegressionClassifier()
+    lr.w = np.array([1.0,1.0,1.0])
+    X = np.array([[1.0,2.0,-3.0],[-4.0,-5.0,-6.0]])
+    out = lr.predict(X)
+    check = out == np.array([1,-1])
+    assert check.all()
+    print('Predict Test Success')
 
+def test_score():
+    lr = LogisticRegressionClassifier()
+    X = np.array([[1.0,2.0,-3.0],[-4.0,-5.0,-6.0]])
+    lr.w = np.array([1.0,1.0,1.0])
+    y = np.array([1.0,1.0])
+    s = lr.score(X, y)
+    assert 0.5 == s
+    print('Score Test Success')
     
 if __name__ == '__main__':
     test_logistic()
-    test_cost()
-    test_grad()
+    test_predict()
+    test_score()
+    #test_cost()
+    #test_grad()
+    
+    
+
+    
     
     

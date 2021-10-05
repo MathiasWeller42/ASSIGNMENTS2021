@@ -154,18 +154,16 @@ func main() {
 	timeVerification(1000000)
 	timeVerification(10000000)
 	timeVerification(100000000)
-	timeVerification(1000000000)
 
 	fmt.Println("\n Test 3: ")
 	fmt.Println("Testing how much time it takes to sign a hashed message: ")
 	message3 := "Hello bro"
 	hashed := hash(message3)
+
 	start := time.Now()
 	sign(hashed)
 	elapsed := time.Since(start)
 	fmt.Println("Time elapsed: ", elapsed)
 
-	fmt.Println("What's up bros?")
-	fmt.Println("The fucking ceiling")
-	fmt.Println("kThXbaYi uwu luv u bae RAWR XD l0l ROFLMAO 10hi f9s ur my <3 simzebazze (sowy im sooo random :P *blushes* *tips fedora*)")
+	fmt.Println("kThXbaYi uwu luv u bae RAWR XD l0l ROFLMAO 10hi f9s ur my <3 simzebazze (sowy omg im sooo random :P *blushes* *tips fedora*)")
 }
