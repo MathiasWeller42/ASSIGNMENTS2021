@@ -36,6 +36,16 @@ def softmax(X):
     ### END CODE
     return res
 
+def permute(X, y):
+    assert y.shape[0] == X.shape[0]
+    xy = np.hstack((X,y[:, np.newaxis]))
+    perm = np.random.permutation(xy)
+    perm_y = perm[:,-1]
+    perm_x = perm[:,:-1]
+    assert y.shape == perm_y.shape
+    assert X.shape == perm_x.shape
+    return perm_x, perm_y
+
 def one_in_k_encoding(vec, k):
     """ One-in-k encoding of vector to k classes 
     
@@ -70,8 +80,16 @@ class SoftmaxClassifier():
         """
         cost = np.nan
         grad = np.zeros(W.shape)*np.nan
-        Yk = one_in_k_encoding(y, self.num_classes) # may help - otherwise you may remove it
+        Yk = one_in_k_encoding(y, self.num_classes) # may help - otherwise you may remove it (nxK matrix)
         ### YOUR CODE HERE
+        n = X.shape[0]
+        soft_res = softmax(X @ W) #nxK matrix
+        only_ys = [soft_res[i, y[i]] for i in range(n)]
+        log_res = np.log(only_ys)
+        cost = - 1.0/float(n) * np.sum(log_res)
+
+        #Luckily, we are told that the gradient is:
+        grad = -1.0/float(n) * X.T @ (Yk - softmax(X@W))
         ### END CODE
         return cost, grad
 
@@ -96,6 +114,22 @@ class SoftmaxClassifier():
         if W is None: W = np.zeros((X.shape[1], self.num_classes))
         history = []
         ### YOUR CODE HERE
+        for e in range(epochs):
+            perm_x, perm_y = permute(X, Y)
+            #print("shape permx, permy:", perm_x.shape, perm_y.shape)
+            batchesX = [perm_x[i:i+batch_size] for i in range(0, len(perm_x), batch_size)]
+            batchesY = [perm_y[i:i+batch_size] for i in range(0, len(perm_y), batch_size)]
+            #OMGListsAreTheBest #Numpy4Life #I<3Python #LinearAlgebraAmirite 
+            #oh, nothing on that index? sure, all good, have a nice day!
+            latest_cost = 0
+            for j in range(len(batchesX)):
+                currentX = batchesX[j]
+                currentY = batchesY[j].astype('int64')
+                cost, grad = self.cost_grad(currentX, currentY, W)
+                latest_cost = cost
+                W = W - (lr * grad)
+            print("Cost in epoch", e, ":", latest_cost)
+            history.append(latest_cost)
         ### END CODE
         self.W = W
         self.history = history
@@ -112,6 +146,8 @@ class SoftmaxClassifier():
         """
         out = 0
         ### YOUR CODE HERE 1-4 lines
+        prediction = self.predict(X)
+        out = np.sum(prediction == Y) / len(Y)
         ### END CODE
         return out
 
@@ -123,15 +159,14 @@ class SoftmaxClassifier():
         Returns
            out: np.array shape (n, ) - prediction on each data point (number in 0,1,..., num_classes)
         """
-        out = np.zeros(X.shape[0])
+        out = None
         ### YOUR CODE HERE - 1-4 lines
-        softmax_res = softmax(X @ self.W)   
-        maxes = np.amax(softmax_res, axis=1)[:, np.newaxis]
-        bools = np.equal(softmax_res, maxes)
-        res = np.where(maxes == softmax_res)[1]
+        out = np.zeros(X.shape[0])
+        softmax_res = softmax(X @ self.W) 
+        out = np.argmax(softmax_res, axis=1)
+        assert out.shape[0] == X.shape[0]
         ### END CODE
-        return res
-
+        return out
 
 
 def test_encoding():
@@ -158,6 +193,16 @@ def test_softmax():
         
 
 def test_grad():
+    scl = SoftmaxClassifier(num_classes=3)
+    X = np.array([[1.0, 0.0], [1.0, 1.0], [1.0, -1.0]])    
+    w = np.ones((2, 3))
+    y = np.array([0, 1, 2])
+    print('*'*5, 'Testing  Gradient')
+    f = lambda z: scl.cost_grad(X, y, W=z)
+    numerical_grad_check(f, w)
+    print('Grad test Success')
+
+def test_cost():
     print('*'*5, 'Testing  Cost')
     scl = SoftmaxClassifier(num_classes=3)
     X = np.array([[1.0, 0.0], [1.0, 1.0], [1.0, -1.0]])    
@@ -165,20 +210,40 @@ def test_grad():
     y = np.array([0, 1, 2])
     cost, _ = scl.cost_grad(X, y, w)
     assert np.allclose(cost,np.log(3)), 'Expected {0} - got {1}'.format(np.log(3), cost)
-    print('*'*5, 'Testing  Gradient')
-    f = lambda z: scl.cost_grad(X, y, W=z)
-    numerical_grad_check(f, w)
-    print('Test Success')
+    print('Cost test success')
 
+
+def test_predict():
+    cl = SoftmaxClassifier(num_classes=2)
+    x = np.array([[7,2],[6,3],[5,6]])
+    cl.W = np.array([[2,1],[3,4]])
+    out = cl.predict(x)
+    assert np.allclose(out, np.array([0,0,1]))
+    print("Prediction test passed")
+
+def test_score():
+    cl = SoftmaxClassifier(num_classes=2)
+    x = np.array([[7,2],[6,3],[5,6]])
+    cl.W = np.array([[2,1],[3,4]])
+    y = np.array([0,0,1])
+    res = cl.score(x,y)    
+    assert res == 1
     
+    y = np.array([0,1,1])
+    res = cl.score(x,y)    
+    assert res == (2/3)
+    print("Score test passed")
+
 if __name__ == "__main__":
     test_encoding()
     test_softmax()
-    #test_grad()
-    cl = SoftmaxClassifier(num_classes=2)
-    x = np.array([[2,1],[3,4],[4,5]])
-    cl.W = np.array([[1,1],[1,1]])
-    out = cl.predict(x)
-    print("out", out)
+    test_score()
+    test_predict()
+    test_cost()
+    test_grad()
+
+
+
     
     
+
