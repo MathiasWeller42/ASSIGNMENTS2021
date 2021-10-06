@@ -90,6 +90,7 @@ class SoftmaxClassifier():
 
         #Luckily, we are told that the gradient is:
         grad = -1.0/float(n) * X.T @ (Yk - softmax(X@W))
+        assert grad.shape == W.shape
         ### END CODE
         return cost, grad
 
@@ -119,8 +120,6 @@ class SoftmaxClassifier():
             #print("shape permx, permy:", perm_x.shape, perm_y.shape)
             batchesX = [perm_x[i:i+batch_size] for i in range(0, len(perm_x), batch_size)]
             batchesY = [perm_y[i:i+batch_size] for i in range(0, len(perm_y), batch_size)]
-            #OMGListsAreTheBest #Numpy4Life #I<3Python #LinearAlgebraAmirite 
-            #oh, nothing on that index? sure, all good, have a nice day!
             latest_cost = 0
             for j in range(len(batchesX)):
                 currentX = batchesX[j]
