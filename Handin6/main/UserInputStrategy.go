@@ -19,7 +19,7 @@ func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Sign
 
 	//prompt user to type a message
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Type account 1:")
+	fmt.Println("Type account 1:") //TODO should ask for a secret key - however, we need a lookup for the corresponding secretkey
 	acc1, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("User quit the program")

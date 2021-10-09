@@ -43,3 +43,12 @@ func (l *Ledger) Print() {
 		fmt.Println("Account", acc, "has balance", balance)
 	}
 }
+
+func (l *Ledger) AddAccount(newAcc string) bool {
+	_, from_exists := l.Accounts[newAcc]
+	if !from_exists {
+		l.Accounts[newAcc] = 0
+		return true
+	}
+	return false
+}

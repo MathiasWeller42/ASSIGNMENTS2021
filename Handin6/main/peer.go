@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 )
@@ -80,6 +81,8 @@ func (peer *Peer) run() {
 	//broadcast new presence in network so everyone can append you to connectionsURI
 	ownURI := peer.ip + ":" + peer.port
 	peer.BroadcastPresence(ownURI)
+
+	// -- TODO setup the secret/public key user here --
 
 	//take input from the user (for testing purposes)
 	go peer.HandleIncomingFromUser()
@@ -210,13 +213,18 @@ func (peer *Peer) SendMessages() {
 		peer.messagesSentMutex.Lock()
 		if !peer.messagesSent[message.ID] {
 			//if this message has not been sent before, print it to the user (for testing purposes) and update ledger
-			peer.UpdateLedger(&message) //Update ledger
+			success := peer.UpdateLedger(&message) //Update ledger - returns true if successful otherwise false
 			//print the ledger for manual testing purposes
 			peer.ledger.Print()
 			peer.messagesSent[message.ID] = true
 			peer.messagesSentMutex.Unlock()
 			//send the message out to all peers in the network
-			peer.messageSendingStrategy.SendMessageToAllPeers(message, peer)
+			if success {
+				peer.messageSendingStrategy.SendMessageToAllPeers(message, peer)
+			} else {
+				fmt.Println("Did not send a valid transaction")
+			}
+
 		} else {
 			peer.messagesSentMutex.Unlock()
 		}
@@ -402,4 +410,28 @@ func (peer *Peer) DemarshalConnectionsURI(bytes []byte) ConnectionsURI {
 
 func (peer *Peer) GetConnections() []net.Conn {
 	return peer.connections
+}
+
+func (peer *Peer) AddNewSkUser() {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Would you like to make a new account - answer y/n?")
+	decision, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("User quit the program")
+		os.Exit(0)
+	}
+	if decision == "yes" || decision == "y" {
+		newRsa := MakeRSA(2000)
+		publicKey := (newRsa.n).String()
+		secretKey := (newRsa.d).String()
+		success := peer.ledger.AddAccount(publicKey)
+		if success {
+			fmt.Println("Successfully created new account, this is your secret Key:")
+			fmt.Println(secretKey)
+			fmt.Println("This is your public name:")
+			fmt.Println(publicKey)
+		}
+	} else if decision == "no" || decision == "n" {
+		fmt.Println("You have chosen to use a preexisting account.")
+	}
 }

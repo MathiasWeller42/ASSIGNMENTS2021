@@ -86,3 +86,25 @@ func TestMakeSignedTransaction(t *testing.T) {
 		fmt.Println("TestMakeSignedTransaction Passed")
 	}
 }
+
+func TestN_encodingToString(t *testing.T) {
+	rsa := MakeRSA(2000)
+	val := *big.NewInt(10)
+	publicN := rsa.n
+	fmt.Println("N value as big_int:", publicN)
+	publicNString := rsa.ConvertBigIntToString(&publicN)
+	fmt.Println("N value as string with rsa.ConvertBigIntToString:", publicNString)
+	publicNString2 := publicN.String()
+	fmt.Println("N value as string with .String:", publicNString2)
+	fmt.Println("Val:", val.String())
+	n := new(big.Int)
+	n, ok := n.SetString(publicNString2, 10)
+	if !ok {
+		fmt.Println("SetString: error")
+		return
+	}
+	fmt.Println("New n:", n)
+	rsa.n = *n
+	fmt.Println("Rsa's new n:", rsa.n)
+
+}
