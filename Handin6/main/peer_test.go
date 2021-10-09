@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"testing"
@@ -78,12 +79,8 @@ func TestShouldMarshalTransactionCorrectly(t *testing.T) { //works sometimes, go
 		fmt.Println("From not equal")
 	} else if demarshalled.To != transaction.To {
 		fmt.Println("To not equal")
-	} else if demarshalled.Signature != transaction.Signature {
+	} else if !bytes.Equal(demarshalled.Signature, transaction.Signature) {
 		fmt.Println("Signatures not equal, got: ", []byte(demarshalled.Signature), ", expected: ", []byte(transaction.Signature))
-	}
-
-	if (*transaction) != demarshalled {
-		t.Error("Demarshalled not the same as original")
 	} else if demarshalled.Amount != 100 {
 		t.Error("Field amount not demarshalled properly")
 	} else {

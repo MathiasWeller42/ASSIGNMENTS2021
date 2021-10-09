@@ -106,13 +106,13 @@ func (rsa *RSA) FullSignTransaction(transaction *SignedTransaction, keyN string,
 	n := rsa.ConvertStringToBigInt(keyN)
 	d := rsa.ConvertStringToBigInt(keyD)
 	stringToSign := transaction.ID + transaction.From + transaction.To + strconv.Itoa(transaction.Amount)
-	transaction.Signature = rsa.ConvertBigIntToString(rsa.FullSign(stringToSign, *n, *d))
+	transaction.Signature = rsa.FullSign(stringToSign, *n, *d).Bytes()
 }
 
 func (rsa *RSA) VerifyTransaction(transaction SignedTransaction) bool {
 	stringToVerify := transaction.ID + transaction.From + transaction.To + strconv.Itoa(transaction.Amount)
-
-	signature := *rsa.ConvertStringToBigInt(transaction.Signature)
+	signature := *big.NewInt(0)
+	signature.SetBytes(transaction.Signature)
 
 	keyN := *rsa.ConvertStringToBigInt(transaction.From)
 

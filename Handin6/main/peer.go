@@ -9,8 +9,8 @@ import (
 	"sync"
 )
 
-type Connections = []net.Conn                  //storing all peer connections
-type MessagesSent = map[SignedTransaction]bool //storing the messages sent
+type Connections = []net.Conn       //storing all peer connections
+type MessagesSent = map[string]bool //storing the messages sent
 
 type ConnectionsURI = []string
 
@@ -38,7 +38,7 @@ func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrate
 	peer.outbound = make(chan SignedTransaction)
 	peer.connectionsMutex = &sync.Mutex{}
 	peer.connections = make([]net.Conn, 0)
-	peer.messagesSent = make(map[SignedTransaction]bool)
+	peer.messagesSent = make(map[string]bool)
 	peer.messagesSentMutex = &sync.Mutex{}
 	peer.uriStrategy = uri
 	peer.userInputStrategy = user
@@ -208,12 +208,12 @@ func (peer *Peer) SendMessages() {
 		//get a message from the channel and check if it has been sent before
 		message := <-peer.outbound
 		peer.messagesSentMutex.Lock()
-		if !peer.messagesSent[message] {
+		if !peer.messagesSent[message.ID] {
 			//if this message has not been sent before, print it to the user (for testing purposes) and update ledger
 			peer.UpdateLedger(&message) //Update ledger
 			//print the ledger for manual testing purposes
 			peer.ledger.Print()
-			peer.messagesSent[message] = true
+			peer.messagesSent[message.ID] = true
 			peer.messagesSentMutex.Unlock()
 			//send the message out to all peers in the network
 			peer.messageSendingStrategy.SendMessageToAllPeers(message, peer)
