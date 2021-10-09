@@ -83,7 +83,7 @@ func (peer *Peer) run() {
 	peer.BroadcastPresence(ownURI)
 
 	// -- TODO setup the secret/public key user here --
-
+	//peer.AddNewSkUser() //note that this method breaks some of the tests.
 	//take input from the user (for testing purposes)
 	go peer.HandleIncomingFromUser()
 
@@ -420,18 +420,20 @@ func (peer *Peer) AddNewSkUser() {
 		fmt.Println("User quit the program")
 		os.Exit(0)
 	}
-	if decision == "yes" || decision == "y" {
+	fmt.Println("the decision:", decision)
+	trimmedDecision := strings.TrimRight(decision, "\r\n")
+	if trimmedDecision == "y" || trimmedDecision == "yes" {
 		newRsa := MakeRSA(2000)
 		publicKey := (newRsa.n).String()
 		secretKey := (newRsa.d).String()
 		success := peer.ledger.AddAccount(publicKey)
 		if success {
 			fmt.Println("Successfully created new account, this is your secret Key:")
-			fmt.Println(secretKey)
+			fmt.Println(secretKey) //notice that both secret and public key are formatted as strings corresponding to the value inside the BigInt, and NOT bytes translated into string from the bigInt.
 			fmt.Println("This is your public name:")
 			fmt.Println(publicKey)
 		}
-	} else if decision == "no" || decision == "n" {
+	} else {
 		fmt.Println("You have chosen to use a preexisting account.")
 	}
 }
