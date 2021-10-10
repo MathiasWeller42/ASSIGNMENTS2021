@@ -1,0 +1,5 @@
+let
+    var var := 9
+in
+    var
+end

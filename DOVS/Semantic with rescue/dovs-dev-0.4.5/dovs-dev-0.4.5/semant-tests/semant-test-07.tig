@@ -1,0 +1,10 @@
+let
+    var y: int := 1
+in
+let
+    var x: int := 5
+    var z: int := x
+in 
+    (let var x: string := "hello" in x end; x)
+end
+end

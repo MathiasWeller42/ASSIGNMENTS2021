@@ -1,0 +1,1 @@
+(:standard -I  ../../rescue/lexer/byte ../../rescue/lexer/byte/tigerlexer__Lexer.cmo)

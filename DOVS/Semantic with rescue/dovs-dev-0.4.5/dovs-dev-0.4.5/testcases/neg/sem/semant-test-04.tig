@@ -1,0 +1,6 @@
+/*Assignment to variable which doesn't exist */
+let
+    var x:int := 5
+in 
+    (y := 3; x)
+end

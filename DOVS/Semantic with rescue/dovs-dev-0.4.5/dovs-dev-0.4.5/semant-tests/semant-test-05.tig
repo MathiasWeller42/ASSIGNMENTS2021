@@ -1,0 +1,2 @@
+/*Wrong number of arguments to function*/
+print("hello", "goodbye")

@@ -1,0 +1,6 @@
+/* wrong type in assignment */
+let
+    var x: int := 5
+in 
+    x := "hello"
+end

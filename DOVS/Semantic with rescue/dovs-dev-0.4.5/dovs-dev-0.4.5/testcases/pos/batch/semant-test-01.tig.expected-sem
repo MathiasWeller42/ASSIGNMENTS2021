@@ -1,0 +1,10 @@
+(INT,
+  LetExp([
+  | VarDec(x,true,INT,
+  |   (INT,
+  |   | IntExp(1))),
+  | VarDec(y,true,INT,
+  |   (INT,
+  |   | IntExp(2)))],
+  | (INT,
+  |   IntExp(10))))

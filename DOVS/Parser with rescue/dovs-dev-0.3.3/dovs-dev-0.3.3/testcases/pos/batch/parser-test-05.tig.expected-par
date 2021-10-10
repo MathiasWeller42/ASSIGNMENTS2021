@@ -1,0 +1,25 @@
+LetExp([
+  TypeDec[
+  | (intArray,
+  |   ArrayTy(int))],
+  VarDec(a,true,NONE,
+  | ArrayExp(intArray,
+  |   IntExp(30),
+  |   IntExp(0)))],
+  SeqExp[
+  | VarExp(
+  |   FieldVar(
+  |   | SubscriptVar(
+  |   |   SubscriptVar(
+  |   |   | FieldVar(
+  |   |   |   SubscriptVar(
+  |   |   |   | SubscriptVar(
+  |   |   |   |   SubscriptVar(
+  |   |   |   |   | SimpleVar(a),
+  |   |   |   |   | IntExp(10)),
+  |   |   |   |   IntExp(20)),
+  |   |   |   | IntExp(30)),
+  |   |   |   name),
+  |   |   | IntExp(10)),
+  |   |   IntExp(20)),
+  |   | value))])

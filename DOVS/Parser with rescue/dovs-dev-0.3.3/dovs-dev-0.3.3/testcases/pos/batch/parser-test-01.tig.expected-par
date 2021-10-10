@@ -1,0 +1,11 @@
+OpExp(DivideOp,
+  SeqExp[
+  | OpExp(PlusOp,
+  |   IntExp(10),
+  |   SeqExp[
+  |   | OpExp(TimesOp,
+  |   |   IntExp(20),
+  |   |   OpExp(MinusOp,
+  |   |   | IntExp(0),
+  |   |   | IntExp(10)))])],
+  IntExp(2))

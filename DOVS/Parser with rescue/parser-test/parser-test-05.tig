@@ -1,0 +1,6 @@
+let 
+    type intArray = array of int
+    var a := intArray[30] of 0
+in
+    a[10][20][30].name[10][20].value
+end

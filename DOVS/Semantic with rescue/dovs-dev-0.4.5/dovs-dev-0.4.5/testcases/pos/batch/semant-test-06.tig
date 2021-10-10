@@ -1,0 +1,6 @@
+let 
+    var x: int := 6
+    var y: int := x
+in 
+    x 
+end
