@@ -157,6 +157,8 @@ func (peer *Peer) JoinNetwork(uri string) net.Conn {
 		peer.connectionsURI = peer.ReceiveConnectionsURI(out_conn)
 		peer.connectionsURIMutex.Unlock()
 		fmt.Println("Received connectionsURI")
+		fmt.Println("Handling from the one I just connected to:")
+		go peer.HandleIncomingMessagesFromPeer(out_conn)
 
 		//connect to the 10 peers before yourself in the list
 		peer.ConnectToFirst10PeersInConnectionsURI(peer.connectionsURI, uri)

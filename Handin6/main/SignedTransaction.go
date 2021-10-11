@@ -10,7 +10,7 @@ type SignedTransaction struct {
 	ID        string
 	From      string
 	To        string
-	Signature []byte
+	Signature string
 	Amount    int
 }
 
