@@ -19,6 +19,7 @@ func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Sign
 
 	//prompt user to type a message
 	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Make a new transaction:")
 	fmt.Println("Type 'From' account (public key):")
 	acc1, err := reader.ReadString('\n')
 	if err != nil {
@@ -41,8 +42,8 @@ func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Sign
 	trimmed := strings.TrimSpace(amount)
 	val, err := strconv.Atoi(trimmed)
 	if err != nil {
-		fmt.Println("Wrong conversion to int")
-		val = 123
+		fmt.Println("Wrong conversion to int, setting the value to -1 (invalid message)")
+		val = -1
 	}
 	fmt.Println("Type your secret key:")
 	privateKey, err := reader.ReadString('\n')
