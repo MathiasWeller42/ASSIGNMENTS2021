@@ -1,0 +1,14 @@
+(INT,
+  LetExp([
+  | VarDec(x,true,INT,
+  |   (INT,
+  |   | IntExp(6))),
+  | VarDec(y,true,INT,
+  |   (INT,
+  |   | VarExp(
+  |   |   (INT,
+  |   |   | SimpleVar(x)))))],
+  | (INT,
+  |   VarExp(
+  |   | (INT,
+  |   |   SimpleVar(x))))))

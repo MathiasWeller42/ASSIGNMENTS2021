@@ -1,0 +1,30 @@
+(INT,
+  LetExp([
+  | VarDec(y,true,INT,
+  |   (INT,
+  |   | IntExp(1)))],
+  | (INT,
+  |   LetExp([
+  |   | VarDec(x,true,INT,
+  |   |   (INT,
+  |   |   | IntExp(5))),
+  |   | VarDec(z,true,INT,
+  |   |   (INT,
+  |   |   | VarExp(
+  |   |   |   (INT,
+  |   |   |   | SimpleVar(x)))))],
+  |   | (INT,
+  |   |   SeqExp[
+  |   |   | (STRING,
+  |   |   |   LetExp([
+  |   |   |   | VarDec(x,true,STRING,
+  |   |   |   |   (STRING,
+  |   |   |   |   | StringExp("hello")))],
+  |   |   |   | (STRING,
+  |   |   |   |   VarExp(
+  |   |   |   |   | (STRING,
+  |   |   |   |   |   SimpleVar(x)))))),
+  |   |   | (INT,
+  |   |   |   VarExp(
+  |   |   |   | (INT,
+  |   |   |   |   SimpleVar(x))))])))))
