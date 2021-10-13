@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -72,7 +71,7 @@ func TestMakeSignedTransaction(t *testing.T) {
 	st := MakeSignedTransaction(publicKey, "test", 200, secretKeyD)
 	stringToSign := st.ID + st.From + st.To + strconv.Itoa(st.Amount)
 	signAsBig := rsa.FullSign(stringToSign, *rsa.ConvertStringToBigInt(publicKey), *rsa.ConvertStringToBigInt(secretKeyD))
-	sign := signAsBig.Bytes()
+	sign := rsa.ConvertBigIntToString(signAsBig)
 
 	if st.From != publicKey {
 		fmt.Println("TestMakeSignedTransaction Failed 1")
@@ -80,7 +79,7 @@ func TestMakeSignedTransaction(t *testing.T) {
 		fmt.Println("TestMakeSignedTransaction Failed 2")
 	} else if st.Amount != 200 {
 		fmt.Println("TestMakeSignedTransaction Failed 3")
-	} else if !bytes.Equal(st.Signature, sign) {
+	} else if st.Signature != sign {
 		fmt.Println("TestMakeSignedTransaction Failed 4, expected:", sign, "got ", st.Signature)
 	} else {
 		fmt.Println("TestMakeSignedTransaction Passed")

@@ -19,19 +19,20 @@ func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Sign
 
 	//prompt user to type a message
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Type account 1:") //TODO should ask for a secret key - however, we need a lookup for the corresponding secretkey
+	fmt.Println("Make a new transaction:")
+	fmt.Println("Type 'From' account (public key):")
 	acc1, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("User quit the program")
 		os.Exit(0)
 	}
-	fmt.Println("Type account 2:")
+	fmt.Println("Type 'To' account (public key):")
 	acc2, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("User quit the program")
 		os.Exit(0)
 	}
-	fmt.Println("Type amount:")
+	fmt.Println("Type amount (more than 0):")
 	amount, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("User quit the program")
@@ -41,10 +42,10 @@ func (inputStrategy *CommandLineUserInputStrategy) HandleIncomingFromUser() Sign
 	trimmed := strings.TrimSpace(amount)
 	val, err := strconv.Atoi(trimmed)
 	if err != nil {
-		fmt.Println("Wrong conversion to int")
-		val = 123
+		fmt.Println("Wrong conversion to int, setting the value to -1 (invalid message)")
+		val = -1
 	}
-	fmt.Println("Type private key:")
+	fmt.Println("Type your secret key:")
 	privateKey, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("User quit the program")

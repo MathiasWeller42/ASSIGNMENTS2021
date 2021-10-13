@@ -71,6 +71,7 @@ func (peer *Peer) run() {
 	if conn != nil {
 		defer conn.Close()
 	}
+
 	//listen for connections on own ip and port to which other peers can connect, the listener object is passed to takeNewConnection
 	listener := peer.StartListeningForConnections()
 	defer listener.Close()
@@ -82,8 +83,6 @@ func (peer *Peer) run() {
 	ownURI := peer.ip + ":" + peer.port
 	peer.BroadcastPresence(ownURI)
 
-	// -- TODO setup the secret/public key user here --
-	//peer.AddNewSkUser() //note that this method breaks some of the tests.
 	//take input from the user (for testing purposes)
 	go peer.HandleIncomingFromUser()
 
@@ -111,7 +110,7 @@ func (peer *Peer) TakeNewConnection(listener net.Listener) {
 	//send own connectionsURI in case the new peer is brand new
 	peer.SendConnectionsURI(in_conn)
 
-	//handle input from the new connection and send all previous messages to new
+	//handle input from the new connection (and send all previous messages to new?)
 	go peer.HandleIncomingMessagesFromPeer(in_conn)
 }
 
@@ -161,7 +160,7 @@ func (peer *Peer) JoinNetwork(uri string) net.Conn {
 		peer.connectionsURIMutex.Lock()
 		peer.connectionsURI = peer.ReceiveConnectionsURI(out_conn)
 		peer.connectionsURIMutex.Unlock()
-		fmt.Println("Received connectionsURI")
+		go peer.HandleIncomingMessagesFromPeer(out_conn)
 
 		//connect to the 10 peers before yourself in the list
 		peer.ConnectToFirst10PeersInConnectionsURI(peer.connectionsURI, uri)
@@ -174,7 +173,6 @@ func (peer *Peer) ConnectToPeer(uri string) {
 	if err != nil {
 		return
 	} else {
-		fmt.Println("Appending to connections")
 		peer.AppendToConnections(out_conn)
 		go peer.HandleIncomingMessagesFromPeer(out_conn)
 	}
@@ -184,7 +182,7 @@ func (peer *Peer) ReceiveConnectionsURI(coming_from net.Conn) ConnectionsURI {
 	reader := bufio.NewReader(coming_from)
 	marshalled, err := reader.ReadBytes(']')
 	if err != nil {
-		fmt.Println("Lost connection to Peer")
+		fmt.Println("Lost connection to peer")
 		panic(-1)
 	}
 	connectionsURI := peer.DemarshalConnectionsURI(marshalled)
@@ -220,9 +218,10 @@ func (peer *Peer) SendMessages() {
 			peer.messagesSentMutex.Unlock()
 			//send the message out to all peers in the network
 			if success {
+				fmt.Println("Transaction was validated and added to ledger, now broadcasting it")
 				peer.messageSendingStrategy.SendMessageToAllPeers(message, peer)
 			} else {
-				fmt.Println("Did not send a valid transaction")
+				fmt.Println("Did not send an invalid transaction")
 			}
 
 		} else {
@@ -312,6 +311,7 @@ func (peer *Peer) RemoveURI(slice []string, s int) []string {
 
 //only used for manual testing
 func (peer *Peer) HandleIncomingFromUser() {
+	peer.AddNewSkUser()
 	for {
 		msg := peer.userInputStrategy.HandleIncomingFromUser()
 		peer.outbound <- msg
@@ -345,22 +345,17 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 				//This was a connectionsURI list so ignore it
 			}
 		} else {
-			//add message to channel
+			//demarshalled a transaction - adding message to channel
 			peer.outbound <- msg
 		}
 	}
 }
 
-/*
-func (peer *Peer) UpdateLedger(transaction *Transaction) {
-	peer.ledger.Transaction(transaction)
-}*/
-
 func (peer *Peer) UpdateLedger(transaction *SignedTransaction) bool {
 	var success bool
 	if transaction.Amount >= 0 && peer.rsa.VerifyTransaction(*transaction) {
 		peer.ledger.Transaction(transaction)
-		fmt.Println("Message put in ledger and sent: ", transaction)
+		fmt.Println("Message successfully put in ledger")
 		success = true
 	} else {
 		success = false
@@ -394,7 +389,6 @@ func (peer *Peer) MarshalConnectionsURI(connectionsURI ConnectionsURI) []byte {
 	if err != nil {
 		fmt.Println("Marshaling connectionsURI failed")
 	}
-	fmt.Println(bytes)
 	return bytes
 }
 
@@ -404,7 +398,6 @@ func (peer *Peer) DemarshalConnectionsURI(bytes []byte) ConnectionsURI {
 	if err != nil {
 		fmt.Println("Demarshaling connectionsURI failed", err)
 	}
-	fmt.Println(connectionsURI)
 	return connectionsURI
 }
 
@@ -420,7 +413,6 @@ func (peer *Peer) AddNewSkUser() {
 		fmt.Println("User quit the program")
 		os.Exit(0)
 	}
-	fmt.Println("the decision:", decision)
 	trimmedDecision := strings.TrimRight(decision, "\r\n")
 	if trimmedDecision == "y" || trimmedDecision == "yes" {
 		newRsa := MakeRSA(2000)
@@ -430,10 +422,12 @@ func (peer *Peer) AddNewSkUser() {
 		if success {
 			fmt.Println("Successfully created new account, this is your secret Key:")
 			fmt.Println(secretKey) //notice that both secret and public key are formatted as strings corresponding to the value inside the BigInt, and NOT bytes translated into string from the bigInt.
-			fmt.Println("This is your public name:")
+			fmt.Println("And this is your public name:")
 			fmt.Println(publicKey)
 		}
 	} else {
 		fmt.Println("You have chosen to use a preexisting account.")
 	}
+	fmt.Println("You can now make transactions using your public and secret key.")
+	fmt.Println("---------------------------------------------------------------------------------------------------------")
 }

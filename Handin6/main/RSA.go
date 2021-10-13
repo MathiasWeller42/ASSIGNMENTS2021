@@ -106,17 +106,17 @@ func (rsa *RSA) FullSignTransaction(transaction *SignedTransaction, keyN string,
 	n := rsa.ConvertStringToBigInt(keyN)
 	d := rsa.ConvertStringToBigInt(keyD)
 	stringToSign := transaction.ID + transaction.From + transaction.To + strconv.Itoa(transaction.Amount)
-	transaction.Signature = rsa.FullSign(stringToSign, *n, *d).Bytes()
+	transaction.Signature = rsa.ConvertBigIntToString(rsa.FullSign(stringToSign, *n, *d))
 }
 
 func (rsa *RSA) VerifyTransaction(transaction SignedTransaction) bool {
 	stringToVerify := transaction.ID + transaction.From + transaction.To + strconv.Itoa(transaction.Amount)
-	signature := *big.NewInt(0)
-	signature.SetBytes(transaction.Signature)
+
+	signature := rsa.ConvertStringToBigInt(transaction.Signature)
 
 	keyN := *rsa.ConvertStringToBigInt(transaction.From)
 
-	verified := rsa.VerifyWithKey(stringToVerify, signature, keyN, big.NewInt(3))
+	verified := rsa.VerifyWithKey(stringToVerify, *signature, keyN, big.NewInt(3))
 	return verified
 }
 
@@ -124,7 +124,7 @@ func (rsa *RSA) VerifyWithKey(m string, s big.Int, keyN big.Int, keyE *big.Int) 
 	decryptedSignature := rsa.EncryptWithKey(&s, keyN, keyE)
 	hashed := rsa.Hash(m)
 	var verified bool
-	if bytes.Compare(hashed.Bytes(), decryptedSignature.Bytes()) == 0 {
+	if bytes.Equal(hashed.Bytes(), decryptedSignature.Bytes()) {
 		verified = true
 	} else {
 		verified = false
@@ -140,14 +140,13 @@ func (rsa *RSA) EncryptWithKey(message *big.Int, keyN big.Int, keyE *big.Int) bi
 }
 
 func (rsa *RSA) ConvertStringToBigInt(str string) *big.Int {
-	s := big.NewInt(0)
-	s.SetBytes([]byte(str))
+	s := new(big.Int)
+	s.SetString(str, 10)
 	return s
 }
 
 func (rsa *RSA) ConvertBigIntToString(big *big.Int) string {
-	bytes := big.Bytes()
-	return string(bytes)
+	return big.String()
 }
 
 func (rsa *RSA) Verify(m string, s big.Int) bool {
