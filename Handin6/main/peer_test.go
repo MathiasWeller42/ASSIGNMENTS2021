@@ -44,6 +44,56 @@ func TestShouldMarshalConnectionsCorrectly(t *testing.T) { //pass
 	}
 }
 
+func TestShouldSendVerifiedTransactionCorrectlyToAnotherPeer(t *testing.T) {
+	peer1, listener1 := createPeer("fa", "fa")
+	defer listener1.Close()
+
+	peer2, listener := createPeer(peer1.ip, peer1.port)
+	defer listener.Close()
+	newRsa := MakeRSA(2000)
+	publicKey := (newRsa.n).String()
+	secretKey := (newRsa.d).String()
+
+	peer3, listener3 := createPeerWithTransaction(peer1.ip, peer1.port, publicKey, "bob", 200, secretKey)
+	defer listener3.Close()
+	time.Sleep(2 * time.Second)
+	if !(peer3.ledger.Accounts[publicKey] == -200) {
+		fmt.Println("ledger3 account not right, has value", peer1.ledger.Accounts[publicKey])
+	} else if !(peer2.ledger.Accounts[publicKey] == -200) {
+		fmt.Println("ledger2 account not right")
+	} else if !(peer1.ledger.Accounts[publicKey] == -200) {
+		fmt.Println("ledger1 account not right")
+	} else {
+		fmt.Println("Test passed, the tranasction was succesfully sent and verified at all peers")
+	}
+
+}
+
+func TestShouldNotSendUnVerifiedTransactionCorrectlyToAnotherPeer(t *testing.T) {
+	peer1, listener1 := createPeer("fa", "fa")
+	defer listener1.Close()
+
+	peer2, listener := createPeer(peer1.ip, peer1.port)
+	defer listener.Close()
+	newRsa := MakeRSA(2000)
+	publicKey := (newRsa.n).String()
+	secretKey := "wrong"
+
+	peer3, listener3 := createPeerWithTransaction(peer1.ip, peer1.port, publicKey, "bob", 200, secretKey)
+	defer listener3.Close()
+	time.Sleep(2 * time.Second)
+	if !(peer3.ledger.Accounts[publicKey] == 0) {
+		fmt.Println("ledger3 account not right, has value", peer1.ledger.Accounts[publicKey])
+	} else if !(peer2.ledger.Accounts[publicKey] == 0) {
+		fmt.Println("ledger2 account not right")
+	} else if !(peer1.ledger.Accounts[publicKey] == 0) {
+		fmt.Println("ledger1 account not right")
+	} else {
+		fmt.Println("Test passed, the tranasction was not sent and thus was not verified")
+	}
+
+}
+
 /*
 func TestPeerUpdateLedgerShouldUpdateWithTransaction(t *testing.T) { //TODO
 	peer := peerFixture()
@@ -253,8 +303,41 @@ func createPeer(ip string, port string) (*Peer, net.Listener) {
 	return peer, listener
 }
 
+func createPeerWithTransaction(ip string, port string, from string, to string, amount int, secret string) (*Peer, net.Listener) {
+	transaction := MakeSignedTransaction(from, to, amount, secret)
+
+	fixedUriStrategy := MakeFixedUriStrategy(ip, port)
+	fixedInputStrategy := MakeFixedInputStrategy(*transaction)
+	fixedOutboundIPStrategy := MakeFixedOutboundIPStrategy("localhost")
+	messageSendingStrategy := new(RealMessageSendingStrategy)
+	peer := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
+
+	uri := peer.GetURI()
+
+	peer.JoinNetwork(uri)
+
+	listener := peer.StartListeningForConnections()
+
+	peer.AddSelfToConnectionsURI()
+
+	ownURI := peer.ip + ":" + peer.port
+	peer.BroadcastPresence(ownURI)
+
+	//go peer.HandleIncomingFromUser()
+	go send1message(peer)
+	go peer.SendMessages()
+	go takeNewConnectionsHelp(peer, listener)
+
+	return peer, listener
+}
+
 func takeNewConnectionsHelp(peer *Peer, listener net.Listener) {
 	for {
 		peer.TakeNewConnection(listener)
 	}
+}
+
+func send1message(peer *Peer) {
+	msg := peer.userInputStrategy.HandleIncomingFromUser()
+	peer.outbound <- msg
 }
