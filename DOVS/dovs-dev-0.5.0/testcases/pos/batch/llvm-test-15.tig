@@ -1,0 +1,4 @@
+(if( 1000 ) then print("pass") else print("fail");
+if( -1 ) then print("pass") else print("fail");
+if( 0 ) then print("fail") else print( "pass" )
+)

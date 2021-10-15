@@ -1,0 +1,9 @@
+(
+if( (-1)^-1 = -1 ) then print("pass") else print("fail");
+if( (1)^-1 = 1 ) then print("pass") else print("fail");
+if( (-1)^1 = -1 ) then print("pass") else print("fail");
+if( 1 ^ (-2) = 1 ) then print("pass") else print("fail");
+if( 2^(-2) = 0 ) then print("pass") else print("fail");
+if( 1 ^ (2) = 1  ) then print("pass") else print("fail");
+if( 2 ^ 32 ) then print("pass") else print("fail")
+)

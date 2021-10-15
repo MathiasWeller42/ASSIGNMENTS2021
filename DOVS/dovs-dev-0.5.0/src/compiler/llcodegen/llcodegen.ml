@@ -139,8 +139,6 @@ let rec cgExp ({gdecls; locals} : context) (Exp {exp_base; pos; ty} : H.exp) :
       | _ -> raise Impossible 
       )
 
-      
-      
   | H.CallExp {func; lvl_diff= 0; args} ->
       (* lvl_diff returned from the hoisting phase for Tiger Cub is always zero *)
       let mapped = List.map cgE args in 
@@ -181,12 +179,21 @@ let rec cgExp ({gdecls; locals} : context) (Exp {exp_base; pos; ty} : H.exp) :
       let els_lbl = fresh "lbl" in
       let end_lbl = fresh "lbl" in
       let ret_ty = ty_to_llty ty in
-      let test_with_term = (B.add_alloca(common_var, ret_ty) $> build_test $> B.add_insn(Some(cast_test), Ll.Icmp(Ll.Ne, Ll.I64, op_test, Ll.Const 0)) $>(B.term_block (Ll.Cbr (Ll.Id cast_test, thn_lbl, els_lbl)))) in
-      let then_with_term = (B.start_block (thn_lbl)) $> build_thn $> B.add_insn (None, Ll.Store (ret_ty, op_thn, Ll.Id common_var)) $> B.term_block(Ll.Br end_lbl ) in
-      let els_with_term  = (B.start_block (els_lbl)) $> build_els $> B.add_insn (None, Ll.Store (ret_ty, op_els, Ll.Id common_var)) $> B.term_block(Ll.Br end_lbl ) in
-      let end_block = (B.start_block (end_lbl)) $> B.add_insn (Some(result), Ll.Load (ret_ty, Ll.Id common_var)) in
-      let return_block = B.seq_buildlets [ test_with_term; then_with_term; els_with_term; end_block ] in
-      (return_block, Ll.Id result)
+      if ret_ty = Ll.Void 
+        then 
+          (let test_with_term = (build_test $> B.add_insn(Some(cast_test), Ll.Icmp(Ll.Ne, Ll.I64, op_test, Ll.Const 0)) $>(B.term_block (Ll.Cbr (Ll.Id cast_test, thn_lbl, els_lbl)))) in
+          let then_with_term = (B.start_block (thn_lbl)) $> build_thn $> B.term_block(Ll.Br end_lbl ) in
+          let els_with_term  = (B.start_block (els_lbl)) $> build_els $> B.term_block(Ll.Br end_lbl ) in
+          let end_block = (B.start_block (end_lbl)) in
+          let return_block = B.seq_buildlets [ test_with_term; then_with_term; els_with_term; end_block ] in
+          (return_block, Null))
+        else
+          (let test_with_term = (B.add_alloca(common_var, ret_ty) $> build_test $> B.add_insn(Some(cast_test), Ll.Icmp(Ll.Ne, Ll.I64, op_test, Ll.Const 0)) $>(B.term_block (Ll.Cbr (Ll.Id cast_test, thn_lbl, els_lbl)))) in
+          let then_with_term = (B.start_block (thn_lbl)) $> build_thn $> B.add_insn (None, Ll.Store (ret_ty, op_thn, Ll.Id common_var)) $> B.term_block(Ll.Br end_lbl ) in
+          let els_with_term  = (B.start_block (els_lbl)) $> build_els $> B.add_insn (None, Ll.Store (ret_ty, op_els, Ll.Id common_var)) $> B.term_block(Ll.Br end_lbl ) in
+          let end_block = (B.start_block (end_lbl)) $> B.add_insn (Some(result), Ll.Load (ret_ty, Ll.Id common_var)) in
+          let return_block = B.seq_buildlets [ test_with_term; then_with_term; els_with_term; end_block ] in
+          (return_block, Ll.Id result))
 
   | H.WhileExp {test; body} -> 
       let test_lbl = fresh "lbl" in
