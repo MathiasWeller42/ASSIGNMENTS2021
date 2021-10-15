@@ -1,0 +1,7 @@
+let 
+    var b: int := 1000000000
+in
+    while b > 0 do
+        b := b - 1;
+    b
+end

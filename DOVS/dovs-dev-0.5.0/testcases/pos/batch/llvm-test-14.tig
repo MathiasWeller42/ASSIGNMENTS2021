@@ -1,0 +1,7 @@
+let 
+    var b: int := 10
+in
+    while b > -4 do
+        b := b - 1;
+    b
+end

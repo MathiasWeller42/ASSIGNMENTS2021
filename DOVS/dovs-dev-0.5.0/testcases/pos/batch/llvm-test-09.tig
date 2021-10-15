@@ -1,0 +1,28 @@
+let 
+    var x: string := "vladimus"
+    var y: string := "rasmus"
+    var z: string := "anna"
+in
+    if (x <> y) then print("true \n") else print("false \n");
+    if (x <> x) then print("true \n") else print("false \n");
+
+    if (x < y) then print("true \n") else print("false \n");
+    if (y < x) then print("true \n") else print("false \n");
+    if (y < y) then print("true \n") else print("false \n");
+
+    if (x <= y) then print("true \n") else print("false \n");
+    if (y <= x) then print("true \n") else print("false \n");
+    if (y <= y) then print("true \n") else print("false \n");
+
+    if (x >= y) then print("true \n") else print("false \n");
+    if (y >= x) then print("true \n") else print("false \n");
+    if (y >= y) then print("true \n") else print("false \n");
+
+    if (x > y) then print("true \n") else print("false \n");
+    if (y > x) then print("true \n") else print("false \n");
+    if (y > y) then print("true \n") else print("false \n");
+
+    if (x = y) then print("true \n") else print("false \n");
+    if (x = x) then print("true \n") else print("false \n")
+    
+end

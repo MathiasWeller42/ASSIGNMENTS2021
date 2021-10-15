@@ -1,0 +1,13 @@
+let 
+    var x: string := "mathias"
+in 
+let
+    var x: int :=  10
+in 
+    ()
+end;
+print(x);
+x
+end
+
+ 

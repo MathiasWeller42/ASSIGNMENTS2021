@@ -1,0 +1,7 @@
+(print(concat(concat("mathias", " vladimus")," \n anna \n"));
+print(concat(substring("mathias", 0, 3), "\n"));
+print(chr(97))
+)
+
+
+
