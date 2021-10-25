@@ -2,13 +2,16 @@ package main
 
 import (
 	"bytes"
-	"crypto/bcrypt"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type RSA struct {
@@ -81,7 +84,7 @@ func (rsa *RSA) GeneratePrime(k int) *big.Int {
 	}
 }
 
-func (rsa *RSA) Hash(message string) *big.Int {
+func Hash(message string) *big.Int {
 	messageAsByte := []byte(message)
 	hashed := sha256.Sum256(messageAsByte)
 	x := big.NewInt(0).SetBytes(hashed[:])
@@ -99,24 +102,24 @@ func (rsa *RSA) SignWithKey(m *big.Int, keyN big.Int, keyD big.Int) big.Int {
 }
 
 func (rsa *RSA) FullSign(message string, keyN big.Int, keyD big.Int) *big.Int {
-	hashed := rsa.Hash(message)
+	hashed := Hash(message)
 	signature := rsa.SignWithKey(hashed, keyN, keyD)
 	return &signature
 }
 
 func (rsa *RSA) FullSignTransaction(transaction *SignedTransaction, keyN string, keyD string) {
-	n := rsa.ConvertStringToBigInt(keyN)
-	d := rsa.ConvertStringToBigInt(keyD)
+	n := ConvertStringToBigInt(keyN)
+	d := ConvertStringToBigInt(keyD)
 	stringToSign := transaction.ID + transaction.From + transaction.To + strconv.Itoa(transaction.Amount)
-	transaction.Signature = rsa.ConvertBigIntToString(rsa.FullSign(stringToSign, *n, *d))
+	transaction.Signature = ConvertBigIntToString(rsa.FullSign(stringToSign, *n, *d))
 }
 
 func (rsa *RSA) VerifyTransaction(transaction SignedTransaction) bool {
 	stringToVerify := transaction.ID + transaction.From + transaction.To + strconv.Itoa(transaction.Amount)
 
-	signature := rsa.ConvertStringToBigInt(transaction.Signature)
+	signature := ConvertStringToBigInt(transaction.Signature)
 
-	keyN := *rsa.ConvertStringToBigInt(transaction.From)
+	keyN := *ConvertStringToBigInt(transaction.From)
 
 	verified := rsa.VerifyWithKey(stringToVerify, *signature, keyN, big.NewInt(3))
 	return verified
@@ -124,7 +127,7 @@ func (rsa *RSA) VerifyTransaction(transaction SignedTransaction) bool {
 
 func (rsa *RSA) VerifyWithKey(m string, s big.Int, keyN big.Int, keyE *big.Int) bool {
 	decryptedSignature := rsa.EncryptWithKey(&s, keyN, keyE)
-	hashed := rsa.Hash(m)
+	hashed := Hash(m)
 	var verified bool
 	if bytes.Equal(hashed.Bytes(), decryptedSignature.Bytes()) {
 		verified = true
@@ -141,19 +144,19 @@ func (rsa *RSA) EncryptWithKey(message *big.Int, keyN big.Int, keyE *big.Int) bi
 	return cipher
 }
 
-func (rsa *RSA) ConvertStringToBigInt(str string) *big.Int {
+func ConvertStringToBigInt(str string) *big.Int {
 	s := new(big.Int)
 	s.SetString(str, 10)
 	return s
 }
 
-func (rsa *RSA) ConvertBigIntToString(big *big.Int) string {
+func ConvertBigIntToString(big *big.Int) string {
 	return big.String()
 }
 
 func (rsa *RSA) Verify(m string, s big.Int) bool {
 	decryptedSignature := rsa.Encrypt(&s)
-	hashed := rsa.Hash(m)
+	hashed := Hash(m)
 	var verified bool
 	if bytes.Equal(hashed.Bytes(), decryptedSignature.Bytes()) {
 		verified = true
@@ -163,62 +166,124 @@ func (rsa *RSA) Verify(m string, s big.Int) bool {
 	return verified
 }
 
-/**
 func Generate(filename string, password string) string {
 	f, _ := os.Create(filename)
 	defer f.Close()
-	rsa := MakeRSA(2000)
-	secretKeyString := rsa.ConvertBigIntToString(&rsa.d)
-
-	hashedPW := rsa.Hash(password).Bytes()
-
-	aes := MakeAES()
-
-	return rsa.ConvertBigIntToString(rsa.e) + ":" + rsa.ConvertBigIntToString(&rsa.n)
-}
-
-func Sign(filename string, password string, msg []byte) string {
-
-	encryptedD, _ := os.ReadFile(filename)
-	encryptedDAsString := string(encryptedD)
-
-	return ""
-}
-*/
-func main() {
-	//Generate("hej", "pass123")
-	//print(Sign("hej", "pass123", []byte("Mathias Weller er den sejeste <3<3<3")))
-	filename := "hej"
-	password := "p4SSw0rd1234!"
-	f, _ := os.Create(filename)
-	defer f.Close()
 	rsa := MakeRSA(2048)
-	secretKeyString := rsa.ConvertBigIntToString(&rsa.d) + ":" + rsa.ConvertBigIntToString(&rsa.n)
+	secretKeyString := ConvertBigIntToString(&rsa.d) + ":" + ConvertBigIntToString(&rsa.n)
 
-	hashedPW := rsa.Hash(password).Bytes()
-	passwordHashToSave := bcrypt.GenerateFromPassword(hashedPW, 10)
+	hashedPW := Hash(password).Bytes()
+
+	passwordHashToSave, _ := bcrypt.GenerateFromPassword(hashedPW, bcrypt.DefaultCost)
 
 	aes := MakeAES()
+
 	encrypted := aes.Encrypt(secretKeyString, hashedPW)
 
-	toWrite := bytes.append(encrypted, passwordHashToSave)
+	toWrite := append(passwordHashToSave, encrypted...)
 	f.Write(toWrite)
 
-	read_bytes, _ := os.ReadFile(filename)
+	return ConvertBigIntToString(rsa.e) + ":" + ConvertBigIntToString(&rsa.n)
+}
 
-	decrypted := aes.Decrypt(string(read_bytes[:32]), hashedPW)
+func Sign(filename string, password string, msg []byte) (string, error) {
 
-	if bytes.Equal(toWrite, read_bytes) {
-		fmt.Println("The encrypted and written to file byte-arrays are equal")
-	} else {
-		fmt.Println("This is encrypted + password hash:", toWrite)
-		fmt.Println("This is read from file:", read_bytes)
-	}
-	if decrypted == secretKeyString {
-		fmt.Println("The string to be encrypted and the resulting decrypted string read from file are equal")
-	} else {
-		fmt.Println("This is SK string:", secretKeyString)
-		fmt.Println("This is decrypted SK string:", decrypted)
+	read_bytes, err := os.ReadFile(filename)
+
+	if err != nil {
+		return "Yo wtf", errors.New("Tried to read non-existing file")
 	}
 
+	hashedPW := Hash(password).Bytes()
+
+	aes := MakeAES()
+	rsa := MakeRSA(2048)
+
+	decrypted := aes.Decrypt(string(read_bytes[60:]), hashedPW)
+
+	savedPasswordHash := read_bytes[:60]
+
+	if bcrypt.CompareHashAndPassword(savedPasswordHash, hashedPW) == nil {
+		//password correct
+
+		dBigInt, nBigInt := ConvertKeyToBigInts(decrypted)
+		mString := string(msg)
+		signed := rsa.FullSign(mString, *nBigInt, *dBigInt)
+		return ConvertBigIntToString(signed), nil
+
+	} else {
+		//error
+		return "That ain't it, Chief", errors.New("Invalid password")
+	}
+}
+func ConvertKeyToBigInts(publicKey string) (*big.Int, *big.Int) {
+	secretKeyAsArray := strings.Split(publicKey, ":")
+	firstString := secretKeyAsArray[0]
+	secondString := secretKeyAsArray[1]
+	firstBigInt := ConvertStringToBigInt(firstString)
+	secondBigInt := ConvertStringToBigInt(secondString)
+	return firstBigInt, secondBigInt
+}
+
+func main() {
+
+	//The filename to be written to, the password to be used and the message to sign:
+	filename := "hej"
+	password := "p4SSw0rd1234!"
+	message := "Matti the Welle-boy er den sejeste <3<3<3 for realz j k rowling in the deep"
+	messageBytes := []byte(message)
+
+	publicKey := Generate(filename, password)
+	eBigInt, nBigInt := ConvertKeyToBigInts(publicKey)
+
+	fmt.Println("First we try to generate and sign correctly")
+
+	signature, err := Sign(filename, password, messageBytes)
+
+	fmt.Println("Checking that signing went well")
+
+	if err != nil {
+		fmt.Println("Something went horribly wrong with signing *fire and blood*")
+		return
+	} else {
+		fmt.Println("Signing errors be cancelled maaaannnn *swag*")
+	}
+
+	fmt.Println("------------------------------------------------------------------------------------------")
+	fmt.Println("Checking verification")
+
+	//Verifying that the public key can be used to verify the signature of the message:
+	rsa := MakeRSA(2048)
+	if !rsa.VerifyWithKey(message, *ConvertStringToBigInt(signature), *nBigInt, eBigInt) {
+		fmt.Println("Something went badly when verifying *surprised pikachu*")
+		return
+	} else {
+		fmt.Println("The signature of the message:", message, ", has been verified with the public key returned from Generate *woah dude that's tight yo*")
+	}
+
+	fmt.Println("------------------------------------------------------------------------------------------")
+	fmt.Println("Now we verify that Sign fails with an invalid password: ")
+	wrongPassword := "NotTheCorrectOneOopsieWhoopsie"
+
+	_, err2 := Sign(filename, wrongPassword, messageBytes)
+
+	if err2 == nil {
+		fmt.Println("Mistakes were made")
+		return
+	} else {
+		fmt.Println("A wrong password does not work - yay! XD")
+	}
+
+	fmt.Println("------------------------------------------------------------------------------------------")
+	fmt.Println("Now we verify that Sign fails with an invalid password: ")
+	wrongFilename := "hejhej"
+
+	_, err3 := Sign(wrongFilename, password, messageBytes)
+
+	if err3 == nil {
+		fmt.Println("Mistakes were made")
+		return
+	} else {
+		fmt.Println("A wrong filename does not work *happy dance*")
+	}
 }
