@@ -200,12 +200,11 @@ func Sign(filename string, password string, msg []byte) (string, error) {
 	aes := MakeAES()
 	rsa := MakeRSA(2048)
 
-	decrypted := aes.Decrypt(string(read_bytes[60:]), hashedPW)
-
 	savedPasswordHash := read_bytes[:60]
 
 	if bcrypt.CompareHashAndPassword(savedPasswordHash, hashedPW) == nil {
 		//password correct
+		decrypted := aes.Decrypt(string(read_bytes[60:]), hashedPW)
 
 		dBigInt, nBigInt := ConvertKeyToBigInts(decrypted)
 		mString := string(msg)
