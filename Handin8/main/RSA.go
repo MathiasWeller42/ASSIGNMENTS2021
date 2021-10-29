@@ -10,7 +10,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+<<<<<<< HEAD
 	"time"
+=======
+>>>>>>> a2bd85b9dddc773fe546bf535e603560de9e9c3a
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -196,6 +199,7 @@ func Sign(filename string, password string, msg []byte) (string, error) {
 	}
 
 	hashedPW := Hash(password).Bytes()
+<<<<<<< HEAD
 
 	aes := MakeAES()
 	rsa := MakeRSA(2048)
@@ -212,6 +216,24 @@ func Sign(filename string, password string, msg []byte) (string, error) {
 		signed := rsa.FullSign(mString, *nBigInt, *dBigInt)
 		return ConvertBigIntToString(signed), nil
 
+=======
+
+	aes := MakeAES()
+	rsa := MakeRSA(2048)
+
+	decrypted := aes.Decrypt(string(read_bytes[60:]), hashedPW)
+
+	savedPasswordHash := read_bytes[:60]
+
+	if bcrypt.CompareHashAndPassword(savedPasswordHash, hashedPW) == nil {
+		//password correct
+
+		dBigInt, nBigInt := ConvertKeyToBigInts(decrypted)
+		mString := string(msg)
+		signed := rsa.FullSign(mString, *nBigInt, *dBigInt)
+		return ConvertBigIntToString(signed), nil
+
+>>>>>>> a2bd85b9dddc773fe546bf535e603560de9e9c3a
 	} else {
 		//error
 		return "That ain't it, Chief", errors.New("Invalid password")
@@ -249,10 +271,17 @@ func main() {
 	} else {
 		fmt.Println("Signing errors be cancelled maaaannnn *swag*")
 	}
+<<<<<<< HEAD
 
 	fmt.Println("------------------------------------------------------------------------------------------")
 	fmt.Println("Checking verification")
 
+=======
+
+	fmt.Println("------------------------------------------------------------------------------------------")
+	fmt.Println("Checking verification")
+
+>>>>>>> a2bd85b9dddc773fe546bf535e603560de9e9c3a
 	//Verifying that the public key can be used to verify the signature of the message:
 	rsa := MakeRSA(2048)
 	if !rsa.VerifyWithKey(message, *ConvertStringToBigInt(signature), *nBigInt, eBigInt) {
@@ -271,6 +300,7 @@ func main() {
 	if err2 == nil {
 		fmt.Println("Mistakes were made")
 		return
+<<<<<<< HEAD
 	} else {
 		fmt.Println("A wrong password does not work - yay! XD")
 	}
@@ -300,4 +330,22 @@ func main() {
 	elapsed := time.Since(start)
 	fmt.Println("Time elapsed: ", elapsed)
 
+=======
+	} else {
+		fmt.Println("A wrong password does not work - yay! XD")
+	}
+
+	fmt.Println("------------------------------------------------------------------------------------------")
+	fmt.Println("Now we verify that Sign fails with an invalid password: ")
+	wrongFilename := "hejhej"
+
+	_, err3 := Sign(wrongFilename, password, messageBytes)
+
+	if err3 == nil {
+		fmt.Println("Mistakes were made")
+		return
+	} else {
+		fmt.Println("A wrong filename does not work *happy dance*")
+	}
+>>>>>>> a2bd85b9dddc773fe546bf535e603560de9e9c3a
 }
