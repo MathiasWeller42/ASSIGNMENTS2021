@@ -38,6 +38,13 @@ def softmax(X):
     """
     res = np.zeros(X.shape)
     ### YOUR CODE HERE
+    maxes = (np.amax(X, axis=1))[:, np.newaxis]
+    lessMax_X = X - maxes
+    exp_X = np.exp(lessMax_X)
+    sum_X = np.sum(exp_X, axis=1)[:, np.newaxis] 
+    log_X = np.log(sum_X) + maxes
+    res = X - log_X
+    res = np.exp(res)
     ### END CODE
     return res
 
@@ -51,6 +58,8 @@ def relu(x):
         Beware of np.max and look at np.maximum
     """
     ### YOUR CODE HERE
+    res = np.maximum(x, np.zeros(x.shape))
+    assert res.shape == x.shape
     ### END CODE
     return res
 
@@ -96,6 +105,14 @@ class NetClassifier():
             params = self.params
         pred = None
         ### YOUR CODE HERE
+        W1 = params['W1']
+        b1 = params['b1']
+        W2 = params['W2']
+        b2 = params['b2']
+        output1 = relu(X @ W1 + b1)
+        output2 = output1 @ W2 + b2
+        probabilities = softmax(output2) #Might have to remove this line?
+        pred = np.argmax(probabilities, axis=1) 
         ### END CODE
         return pred
      
@@ -114,6 +131,8 @@ class NetClassifier():
             params = self.params
         acc = None
         ### YOUR CODE HERE
+        prediction = self.predict(X, params)
+        acc = np.sum(prediction == y) / len(y)
         ### END CODE
         return acc
     
@@ -149,12 +168,45 @@ class NetClassifier():
         labels = one_in_k_encoding(y, W2.shape[1]) # shape n x k
                         
         ### YOUR CODE HERE - FORWARD PASS - compute cost with weight decay and store relevant values for backprop
+        a = X @ W1
+        print("a dim:", a.shape)
+        b = a + b1
+        print("b dim", b.shape)
+        c = relu(b)
+        print("c dim", c.shape)
+        d = c @ W2
+        print("d dim", d.shape)
+        e = d + b2
+        print("e dim", e.shape)
+        softmaxVec = softmax(e)
+        print("softmaxVex dim", softmaxVec.shape)
+        listOfProbabilities = [softmaxVec[i][Y[i]]for i in range(softmaxVec.shape[0])]
+        f = -np.log(listOfProbabilities)
+        print("f dim", len(f))
         ### END CODE
         
-        ### YOUR CODE HERE - BACKWARDS PASS - compute derivatives of all weights and bias, store them in d_w1, d_w2' d_w2, d_b1, d_b2
+        ### YOUR CODE HERE - BACKWARDS PASS - compute derivatives of all weights and bias, store them in d_w1, d_w2, d_b1, d_b2
+        
+        df_de = softmaxVec - labels
+        dd_dc = W2.T
+        dd_dw2 = c.T
+        dc_db = b > 0
+        da_dw1 = W1.T
+
+        print("df_de dim", df_de.shape)
+        print("dd_dc dim", dd_dc.shape)
+        print("dc_db dim", dc_db.shape)
+        print("da_dw1 dim", da_dw1.shape)
+        #print("dd_dw2 dim", dd_dw2.shape)
+
+        df_dw1 = df_de @ dd_dc @ dc_db @ da_dw1
+        df_dw2 = df_de @ dd_dw2
+        df_db1 = df_de @ dd_dc @ dc_db 
+        df_db2 = df_de 
         ### END CODE
         # the return signature
-        return None, {'d_w1': None, 'd_w2': None, 'd_b1': None, 'd_b2': None}
+        loss = -np.mean(f)
+        return loss, {'d_w1': df_dw1, 'd_w2': df_dw2, 'd_b1': df_db1, 'd_b2': df_db2}
         
     def fit(self, X_train, y_train, X_val, y_val, init_params, batch_size=32, lr=0.1, c=1e-4, epochs=30):
         """ Run Mini-Batch Gradient Descent on data X, Y to minimize the in sample error for Neural Net classification
@@ -261,5 +313,23 @@ if __name__ == '__main__':
     params = get_init_params(input_dim, hidden_size, output_size)
     X = np.random.randn(batch_size, input_dim)
     Y = np.array([0, 1, 2, 0, 1, 2, 0])
-    nc.cost_grad(X, Y, params, c=0)
+    nc.cost_grad(X, Y, params, c=0)   
     test_grad()
+    
+    
+    W1 = params['W1']
+    b1 = params['b1']
+    W2 = params['W2']
+    b2 = params['b2']
+    layer1 = X @ W1 + b1 
+    activation1 = relu(layer1)
+    layer2 = activation1 @ W2 + b2
+    softmaxVal = softmax(layer2)
+    listOfProbabilities = [softmaxVal[i][Y[i]]for i in range(softmaxVal.shape[0])]
+    loss = -np.log(listOfProbabilities)
+    print("loss", loss)
+    print("softmaxval: ", softmaxVal)
+    print("new hope:", listOfProbabilities)
+    newsoft = activation1 > 0 
+    print("newsoft:", newsoft)
+    print("mean:", np.sum(newsoft))
