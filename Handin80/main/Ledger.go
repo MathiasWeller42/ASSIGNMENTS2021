@@ -7,12 +7,13 @@ import (
 
 type Ledger struct {
 	Accounts map[string]int
-	lock     sync.Mutex
+	lock     *sync.Mutex
 }
 
 func MakeLedger() *Ledger {
 	ledger := new(Ledger)
 	ledger.Accounts = make(map[string]int)
+	ledger.lock = &sync.Mutex{}
 	return ledger
 }
 
@@ -23,13 +24,20 @@ func (l *Ledger) Transaction(t *SignedTransaction) {
 	//check whether accounts exist, otherwise create them
 	_, from_exists := l.Accounts[t.From]
 	if !from_exists {
-		l.Accounts[t.From] = 0
+		l.Accounts[t.From] = 1000
 	}
 	_, to_exists := l.Accounts[t.To]
 	if !to_exists {
-		l.Accounts[t.To] = 0
+		l.Accounts[t.To] = 1000
 	}
 
+	//check that from account has enough money, otherwise do nothing
+	if l.Accounts[t.From] < t.Amount {
+		fmt.Println("Rejected transaction that makes from account negative")
+		return
+	}
+
+	//move the money
 	l.Accounts[t.From] -= t.Amount
 	l.Accounts[t.To] += t.Amount
 }
@@ -45,9 +53,11 @@ func (l *Ledger) Print() {
 }
 
 func (l *Ledger) AddAccount(newAcc string) bool {
+	l.lock.Lock()
+	defer l.lock.Unlock()
 	_, from_exists := l.Accounts[newAcc]
 	if !from_exists {
-		l.Accounts[newAcc] = 0
+		l.Accounts[newAcc] = 1000
 		return true
 	}
 	return false

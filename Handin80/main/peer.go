@@ -6,14 +6,24 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
-type Connections = []net.Conn       //storing all peer connections
-type MessagesSent = map[string]bool //storing the messages sent
+type Connections = []net.Conn                    //storing all peer connections
+type MessagesSent = map[string]TransactionStruct //storing the messages sent
+type BlocksSent = map[string]bool
 
 type ConnectionsURI = []string
+
+type Block = []string //Second to last entry is the signature
+
+type TransactionStruct struct {
+	transaction SignedTransaction
+	sent        bool
+}
 
 type Peer struct {
 	outbound               chan SignedTransaction //The channel used to handle incoming messages, funelling them to a separate method to handle broadcast and printing
@@ -31,9 +41,15 @@ type Peer struct {
 	connectionsURI         ConnectionsURI //Holds the URIs of all peers currently present in the network.
 	connectionsURIMutex    *sync.Mutex    //Mutex for connectionsURI
 	rsa                    *RSA           //RSA object to do verification and signing
-	seq                    bool           //bool to tell us if we're the sequencer or not
+	seq                    bool           //bool to tell us if this is the sequencer or not
 	seqRSA                 *RSA           //this only exists for the sequencer
-	seqPk                  string         //the Public key for the sequencer (everyone has this)
+	seqPk                  string         //the public key for the sequencer (everyone has this)
+	blocksSent             BlocksSent
+	blocksSentMutex        *sync.Mutex
+	nextBlock              Block
+	nextBlockMutex         *sync.Mutex
+	blockCounter           int
+	blockCounterSeq        int
 }
 
 func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrategy, message MessageSendingStrategy) *Peer {
@@ -42,7 +58,7 @@ func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrate
 	peer.outbound = make(chan SignedTransaction)
 	peer.connectionsMutex = &sync.Mutex{}
 	peer.connections = make([]net.Conn, 0)
-	peer.messagesSent = make(map[string]bool)
+	peer.messagesSent = make(map[string]TransactionStruct)
 	peer.messagesSentMutex = &sync.Mutex{}
 	peer.uriStrategy = uri
 	peer.userInputStrategy = user
@@ -51,7 +67,13 @@ func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrate
 	peer.ledger = MakeLedger()
 	peer.connectionsURI = make([]string, 0)
 	peer.connectionsURIMutex = &sync.Mutex{}
+	peer.blocksSent = make(map[string]bool)
+	peer.blocksSentMutex = &sync.Mutex{}
+	peer.nextBlock = make([]string, 0)
+	peer.nextBlockMutex = &sync.Mutex{}
 	peer.rsa = MakeRSA(2000)
+	peer.blockCounter = 0
+	peer.blockCounterSeq = 0
 	return peer
 }
 
@@ -92,9 +114,32 @@ func (peer *Peer) run() {
 	//set up a thread to send outbound messages
 	go peer.SendMessages()
 
+	if peer.seq {
+		go peer.HandleBlocks()
+	}
+
 	//listen for connections from other peers
 	for {
 		peer.TakeNewConnection(listener)
+	}
+}
+
+func (peer *Peer) HandleBlocks() {
+	for {
+		time.Sleep(10 * time.Second)
+		peer.nextBlockMutex.Lock()
+		if len(peer.nextBlock) == 0 {
+			peer.nextBlockMutex.Unlock()
+		} else {
+			peer.nextBlock = append(peer.nextBlock, strconv.Itoa(peer.blockCounterSeq))
+			fmt.Println("Handleblock hath awoken and shall cast the sendtoall spell - 'and the wicked shall fear it and the righteous shall rejoice', Book of Einstein, 13,37")
+			marshalled := peer.MarshalBlock(peer.nextBlock)
+			peer.sendBlockToAllPeers(marshalled)
+			peer.nextBlock = make([]string, 0)
+			peer.blockCounterSeq++
+			peer.nextBlockMutex.Unlock()
+		}
+
 	}
 }
 
@@ -161,9 +206,8 @@ func (peer *Peer) JoinNetwork(uri string) net.Conn {
 		fmt.Println("No peer found, starting new  peer to peer network - you are the sequencer")
 		peer.seq = true
 		peer.seqRSA = MakeRSA(2000)
-		n := ConvertBigIntToString(&(peer.seqRSA.n))
-		e := ConvertBigIntToString(peer.seqRSA.e)
-		peer.seqPk = n + ":" + e
+		n := ConvertBigIntToString(&(peer.seqRSA.n)) //e is always 3, so only send n
+		peer.seqPk = n
 		fmt.Println("This is seqPK:", peer.seqPk)
 		return nil
 	} else {
@@ -239,19 +283,23 @@ func (peer *Peer) SendMessages() {
 		//get a message from the channel and check if it has been sent before
 		message := <-peer.outbound
 		peer.messagesSentMutex.Lock()
-		if !peer.messagesSent[message.ID] {
-			//if this message has not been sent before, print it to the user (for testing purposes) and update ledger
-			success := peer.UpdateLedger(&message) //Update ledger - returns true if successful otherwise false
-			//print the ledger for manual testing purposes
-			peer.ledger.Print()
-			peer.messagesSent[message.ID] = true
+		fmt.Println("peer.messagesSent[message.ID].sent value:", peer.messagesSent[message.ID].sent)
+		if !peer.messagesSent[message.ID].sent {
+
+			transactionStruct := new(TransactionStruct)
+			transactionStruct.sent = true
+			transactionStruct.transaction = message
+			peer.messagesSent[message.ID] = *transactionStruct
+
 			peer.messagesSentMutex.Unlock()
+
 			//send the message out to all peers in the network
-			if success {
-				fmt.Println("Transaction was validated and added to ledger, now broadcasting it")
-				peer.messageSendingStrategy.SendMessageToAllPeers(message, peer)
-			} else {
-				fmt.Println("Did not send an invalid transaction")
+			peer.messageSendingStrategy.SendMessageToAllPeers(message, peer)
+
+			if peer.seq {
+				peer.nextBlockMutex.Lock()
+				peer.nextBlock = append(peer.nextBlock, message.ID)
+				peer.nextBlockMutex.Unlock()
 			}
 
 		} else {
@@ -383,11 +431,76 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 					peer.BroadcastPresence(uriString)
 				}
 			} else {
-				//This was a connectionsURI list so ignore it
+				//not a new presence, let's see if it is a block
+				demarshalled, err := peer.DemarshalBlock(marshalled)
+				if err != nil {
+					//this was not a block, but a seqPk or connectionsURI
+					fmt.Println("received a seqPk or connectionsURI")
+					continue
+				} else {
+					//this was a block
+					fmt.Println("received a block")
+					if demarshalled[len(demarshalled)-1] == "yeet" && peer.rsa.VerifyBlock(demarshalled, peer.seqPk) {
+						fmt.Println("Verified a demarshalled block")
+						peer.blocksSentMutex.Lock()
+						if !peer.blocksSent[demarshalled[len(demarshalled)-2]] {
+							fmt.Println("Got a new ID/signature of a block")
+							peer.blocksSent[demarshalled[len(demarshalled)-2]] = true
+							blockNo, _ := strconv.Atoi(demarshalled[len(demarshalled)-3])
+							if blockNo == peer.blockCounter {
+								fmt.Println("Got the expected block number, sending the block to all peers")
+								peer.blockCounter++
+								go peer.sendBlockToAllPeers(marshalled)
+								peer.UpdateLedgerWithBlock(demarshalled[:len(demarshalled)-3])
+							} else {
+								fmt.Println("Got an unexpected block number", blockNo, "expected", peer.blockCounter)
+							}
+						} else {
+							fmt.Println("Got an old ID/signature of a block")
+						}
+						peer.blocksSentMutex.Unlock()
+					} else {
+						fmt.Println("Rejected a block")
+					}
+				}
+
 			}
 		} else {
 			//demarshalled a transaction - adding message to channel
+			fmt.Println("Received a transaction, sending to all")
 			peer.outbound <- msg
+		}
+	}
+}
+
+func (peer *Peer) sendBlockToAllPeers(marshalledBlock []byte) {
+	fmt.Println("sendBlockToAllPeers was called")
+	for _, connection := range peer.connections {
+		fmt.Println("Sending block to", connection)
+		peer.SendBlock(connection, marshalledBlock)
+	}
+}
+
+func (peer *Peer) SendBlock(connection net.Conn, marshalledBlock []byte) {
+	//send the marshalled block to the connection
+	fmt.Println("Sendblock was called")
+	_, err := connection.Write(marshalledBlock)
+	if err != nil {
+		fmt.Println("Tried to send to a lost connection")
+		//delete the missing connection
+		peer.DeleteFromConnections(connection)
+	}
+}
+
+func (peer *Peer) UpdateLedgerWithBlock(block Block) {
+	for _, transactionID := range block {
+		transactionStruct := peer.messagesSent[transactionID]
+		success := peer.UpdateLedger(&(transactionStruct.transaction))
+		if success {
+			fmt.Println("Ledger was succesfully updated with transaction from block, this is the new state:")
+			peer.ledger.Print()
+		} else {
+			fmt.Println("updating the ledger failed")
 		}
 	}
 }
@@ -440,6 +553,24 @@ func (peer *Peer) DemarshalConnectionsURI(bytes []byte) ConnectionsURI {
 		fmt.Println("Demarshaling connectionsURI failed", err)
 	}
 	return connectionsURI
+}
+
+func (peer *Peer) MarshalBlock(block Block) []byte {
+	//Signér
+	fmt.Println("Marshalling, signing and appending delimiter to block")
+	block = peer.seqRSA.FullSignBlock(block, peer.seqRSA.n, peer.seqRSA.d) //This appends the signature to the block
+	block = append(block, "yeet")                                          //Add delimiter
+	bytes, err := json.Marshal(block)
+	if err != nil {
+		fmt.Println("Marshalling block failed")
+	}
+	return bytes
+}
+
+func (peer *Peer) DemarshalBlock(bytes []byte) (Block, error) {
+	var block Block
+	err := json.Unmarshal(bytes, &block)
+	return block, err
 }
 
 func (peer *Peer) GetConnections() []net.Conn {

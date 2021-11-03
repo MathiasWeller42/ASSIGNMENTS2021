@@ -224,6 +224,24 @@ func ConvertKeyToBigInts(publicKey string) (*big.Int, *big.Int) {
 	return firstBigInt, secondBigInt
 }
 
+func (rsa *RSA) FullSignBlock(block Block, keyN big.Int, keyD big.Int) Block {
+	stringToSign := strings.Join(block, "")
+	signature := ConvertBigIntToString(rsa.FullSign(stringToSign, keyN, keyD))
+	block = append(block, signature)
+	return block
+}
+
+func (rsa *RSA) VerifyBlock(block Block, keyN string) bool {
+	signature := ConvertStringToBigInt(block[len(block)-2])
+	block = block[:len(block)-2] //-2 because we also append the delimiter in the block
+	stringToVerify := strings.Join(block, "")
+
+	keyNreal := *ConvertStringToBigInt(keyN)
+
+	verified := rsa.VerifyWithKey(stringToVerify, *signature, keyNreal, big.NewInt(3))
+	return verified
+}
+
 /*
 func main() {
 

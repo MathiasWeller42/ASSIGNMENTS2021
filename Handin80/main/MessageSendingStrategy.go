@@ -21,11 +21,14 @@ type StubbedMessageSendingStrategy struct {
 }
 
 func (stubbedMessageSendingStrategy *StubbedMessageSendingStrategy) SendMessageToAllPeers(message SignedTransaction, peer *Peer) {
-	stubbedMessageSendingStrategy.messagesSent[message.ID] = true
+	transactionStruct := new(TransactionStruct)
+	transactionStruct.sent = true
+	transactionStruct.transaction = message
+	stubbedMessageSendingStrategy.messagesSent[message.ID] = *transactionStruct
 }
 
 func MakeStubbedMessageSendingStrategy() *StubbedMessageSendingStrategy {
 	messageSendingStrategy := new(StubbedMessageSendingStrategy)
-	messageSendingStrategy.messagesSent = make(map[string]bool)
+	messageSendingStrategy.messagesSent = make(map[string]TransactionStruct)
 	return messageSendingStrategy
 }

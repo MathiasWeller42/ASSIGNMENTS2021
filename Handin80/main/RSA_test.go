@@ -107,3 +107,22 @@ func TestN_encodingToString(t *testing.T) {
 	fmt.Println("Rsa's new n:", rsa.n)
 
 }
+
+func TestSignVerifyBlock(t *testing.T) {
+	rsa := MakeRSA(2000)
+	block := []string{"kjtg", "daslhfld", "asjhd"}
+	signedBlock := rsa.FullSignBlock(block, rsa.n, rsa.d)
+	signedBlock = append(signedBlock, "delim")
+	fmt.Println("Signature:", signedBlock[len(signedBlock)-1])
+	if rsa.VerifyBlock(signedBlock, ConvertBigIntToString(&rsa.n)) {
+		fmt.Println("test block verification passed, the signed block was verified")
+	} else {
+		fmt.Println("verification failed of block")
+	}
+	newBlock := []string{"ælkfjdhg", "dældsajkhg", "asjhd", signedBlock[len(signedBlock)-2], "delim"}
+	if !(rsa.VerifyBlock(newBlock, ConvertBigIntToString(&rsa.n))) {
+		fmt.Println("wrong block is rejected correctly")
+	} else {
+		fmt.Println("verification passed incorrectly of wrong block")
+	}
+}
