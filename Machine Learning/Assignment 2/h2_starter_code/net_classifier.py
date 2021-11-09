@@ -132,7 +132,7 @@ class NetClassifier():
         acc = None
         ### YOUR CODE HERE
         prediction = self.predict(X, params)
-        acc = np.sum(prediction == y) / len(y)
+        acc = np.mean(prediction == y)
         ### END CODE
         return acc
     
@@ -166,47 +166,75 @@ class NetClassifier():
         W2 = params['W2']
         b2 = params['b2']
         labels = one_in_k_encoding(y, W2.shape[1]) # shape n x k
+        #print("W1 dim:", W1.shape)
+        #print("b1 dim:", b1.shape)
+        #print("W2 dim:", W2.shape)
+        #print("b2 dim:", b2.shape)
+        #print("labels dim:", labels.shape)
                         
         ### YOUR CODE HERE - FORWARD PASS - compute cost with weight decay and store relevant values for backprop
-        a = X @ W1
-        print("a dim:", a.shape)
-        b = a + b1
-        print("b dim", b.shape)
-        c = relu(b)
-        print("c dim", c.shape)
-        d = c @ W2
-        print("d dim", d.shape)
-        e = d + b2
-        print("e dim", e.shape)
-        softmaxVec = softmax(e)
-        print("softmaxVex dim", softmaxVec.shape)
-        listOfProbabilities = [softmaxVec[i][Y[i]]for i in range(softmaxVec.shape[0])]
-        f = -np.log(listOfProbabilities)
-        print("f dim", len(f))
-        ### END CODE
+        nll = np.zeros(X.shape[0])
+        #Summy bois:
+        W1_grad = np.zeros(W1.shape)
+        W2_grad = np.zeros(W2.shape)
+        b1_grad = np.zeros(b1.shape)
+        b2_grad = np.zeros(b2.shape)
+
+        lambd = c
+        for i in range(X.shape[0]):
+            #Forward pass
+            currentRow = X[i,:]
+            a = currentRow @ W1
+            b = a + b1
+            c = relu(b)[0]
+            d = c @ W2
+            e = d + b2
+            softmaxVec = softmax(e)[0]
+            print("softmaxVex vals", softmaxVec)
+            probability = softmaxVec[Y[i]]
+            #print("probability shape:", probability.shape)
+            f = -np.log(probability)
+            #print("f val", f)
+            nll[i] = f
+            #print("Shape of c[:, np.newaxis]:", c[:, np.newaxis].shape)
+            
+            #Backward pass
+            df_de = softmaxVec - labels[i,:]
+            df_db2 = df_de
+            #print("df_de shape", df_de.shape)
+            df_dc = df_de @ W2.T
+            #print("df_dc shape", df_dc.shape)
+            #print("c shape", c.shape)
+            #print("c[0] shape", c[0].shape)
+            df_dw2 = c[:,np.newaxis] * df_de #<-- Anna is responsible
+            #print("df_dw2 shape", df_dw2.shape)
+            dc_db = np.diag(c > 0)
+            #print("dc_db:", dc_db)
+            df_db = df_dc @ dc_db
+            df_da = df_db
+            df_db1 = df_db
+            #print("df_db",df_db)
+            df_dw1 = currentRow[:, np.newaxis] * df_da #<-- Anna is (very, incredibly) responsible      
+
+            W1_grad += df_dw1  
+            W2_grad += df_dw2
+            b1_grad += df_db1
+            b2_grad += df_db2
         
+        dweight_dw1 = lambd * 2 * W1
+        dweight_dw2 = lambd * 2 * W2
+        W1_grad += dweight_dw1
+        W2_grad += dweight_dw2
+        ### END CODE
+
         ### YOUR CODE HERE - BACKWARDS PASS - compute derivatives of all weights and bias, store them in d_w1, d_w2, d_b1, d_b2
         
-        df_de = softmaxVec - labels
-        dd_dc = W2.T
-        dd_dw2 = c.T
-        dc_db = b > 0
-        da_dw1 = W1.T
-
-        print("df_de dim", df_de.shape)
-        print("dd_dc dim", dd_dc.shape)
-        print("dc_db dim", dc_db.shape)
-        print("da_dw1 dim", da_dw1.shape)
-        #print("dd_dw2 dim", dd_dw2.shape)
-
-        df_dw1 = df_de @ dd_dc @ dc_db @ da_dw1
-        df_dw2 = df_de @ dd_dw2
-        df_db1 = df_de @ dd_dc @ dc_db 
-        df_db2 = df_de 
+            #nothin' to see here... *crickets*
+        
         ### END CODE
         # the return signature
-        loss = -np.mean(f)
-        return loss, {'d_w1': df_dw1, 'd_w2': df_dw2, 'd_b1': df_db1, 'd_b2': df_db2}
+        loss = -np.mean(nll) + c * (np.sum(W1**2) + np.sum(W2**2))
+        return loss, {'d_w1': W1_grad, 'd_w2': W2_grad, 'd_b1': b1_grad, 'd_b2': b2_grad}
         
     def fit(self, X_train, y_train, X_val, y_val, init_params, batch_size=32, lr=0.1, c=1e-4, epochs=30):
         """ Run Mini-Batch Gradient Descent on data X, Y to minimize the in sample error for Neural Net classification
@@ -241,8 +269,52 @@ class NetClassifier():
             'val_acc': None, 
         }
 
+        ### YOUR CODE HERE - OBS vi bruger ikke weight decay parameteren!!!
+        n = X_train.shape[0]
+        train_loss = np.zeros[epochs]
+        train_acc = np.zeros[epochs]
+        val_loss = np.zeros[epochs]
+        val_acc = np.zeros[epochs]
+        params = {'W1': None, 'b1': None, 'W2': None, 'b2': None}
+        for i in range(epochs):
+            Xpermuted, Ypermuted = permute(X_train, y_train)
+            batchesX = [Xpermuted[i:i+batch_size] for i in range(0, n, batch_size)]
+            batchesY = [Ypermuted[i:i+batch_size] for i in range(0, n, batch_size)]
+            for j in range(len(batchesX)):
+                currentX = batchesX[j]
+                currentY = batchesY[j]
+                _, grad = self.cost_grad(currentX, currentY, c)
+                W1 = W1 - lr * grad['d_w1']
+                b1 = b1 - lr * grad['d_b1']
+                W2 = W2 - lr * grad['d_w2']
+                b2 = b2 - lr * grad['d_b2']
+
+            params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+            
+            costTrain, _ =  self.cost_grad(X_train, y_train, c)
+            train_loss[i] = costTrain 
+            scoreTrain = self.score(X_train, y_train, params)   
+            train_acc[i] = scoreTrain
+            
+            costVal, _ =  self.cost_grad(X_val, y_val)
+            val_loss[i] = costVal
+            scoreVal = self.score(X_val, y_val, params)
+            val_acc[i] = scoreVal
+            
+            print("Epoch ", i)
+            print("Train_loss", costTrain)
+            print("Train_acc", scoreTrain)
+            print("Val_loss", costVal)
+            print("Val_acc", scoreVal)
         
-        ### YOUR CODE HERE
+        hist = { 
+            'train_loss': train_loss,
+            'train_acc': train_acc,
+            'val_loss': val_loss,
+            'val_acc': val_acc, 
+        }
+        self.params = params
+        
         ### END CODE
         # hist dict should look like this with something different than none
         #hist = {'train_loss': None, 'train_acc': None, 'val_loss': None, 'val_acc': None}
@@ -250,6 +322,16 @@ class NetClassifier():
         # self.params = {'W1': None, 'b1': None, 'W2': None, 'b2': None}
         return hist
         
+def permute(X, y):
+    assert y.shape[0] == X.shape[0]
+    xy = np.hstack((X,y[:, np.newaxis]))
+    perm = np.random.permutation(xy)
+    perm_y = perm[:,-1]
+    perm_x = perm[:,:-1]
+    assert y.shape == perm_y.shape
+    assert X.shape == perm_x.shape
+    return perm_x, perm_y
+
 
 def numerical_grad_check(f, x, key):
     """ Numerical Gradient Checker """
@@ -305,7 +387,29 @@ def test_grad():
     print('Test Success')
 
 if __name__ == '__main__':
+    
     input_dim = 3
+    hidden_size = 5
+    output_size = 4
+    batch_size = 1
+    nc = NetClassifier()
+    params = {'W1': np.ones([3,5]), 'b1': np.ones([1,5]), 'W2': np.ones([5,4]), 'b2':np.ones([1,4]) }
+    X = np.array([[1,2,3],[4,5,6],[7,8,9]])
+    Y = np.array([0, 1, 2])
+    loss, newParams = nc.cost_grad(X,Y,params,c=0)
+    print("params", params)
+    print("-----------------------------------")
+    print("loss", loss)
+    print("gradient W1", newParams['d_w1'])
+    print("gradient W2", newParams['d_w2'])
+    print("gradient b1", newParams['d_b1'])
+    print("gradient b2", newParams['d_b2'])
+    
+    
+    
+    
+    
+    """input_dim = 3
     hidden_size = 5
     output_size = 4
     batch_size = 7
@@ -313,10 +417,13 @@ if __name__ == '__main__':
     params = get_init_params(input_dim, hidden_size, output_size)
     X = np.random.randn(batch_size, input_dim)
     Y = np.array([0, 1, 2, 0, 1, 2, 0])
+    
+    
     nc.cost_grad(X, Y, params, c=0)   
-    test_grad()
+    test_grad()"""
     
-    
+
+    """
     W1 = params['W1']
     b1 = params['b1']
     W2 = params['W2']
@@ -332,4 +439,4 @@ if __name__ == '__main__':
     print("new hope:", listOfProbabilities)
     newsoft = activation1 > 0 
     print("newsoft:", newsoft)
-    print("mean:", np.sum(newsoft))
+    print("mean:", np.sum(newsoft))"""
