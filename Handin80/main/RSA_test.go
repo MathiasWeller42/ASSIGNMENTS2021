@@ -112,6 +112,7 @@ func TestSignVerifyBlock(t *testing.T) {
 	rsa := MakeRSA(2000)
 	block := []string{"kjtg", "daslhfld", "asjhd"}
 	signedBlock := rsa.FullSignBlock(block, rsa.n, rsa.d)
+	fmt.Println("This is the signed block:", signedBlock)
 	signedBlock = append(signedBlock, "delim")
 	fmt.Println("Signature:", signedBlock[len(signedBlock)-1])
 	if rsa.VerifyBlock(signedBlock, ConvertBigIntToString(&rsa.n)) {

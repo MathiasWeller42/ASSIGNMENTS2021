@@ -147,7 +147,7 @@ func (peer *Peer) TakeNewConnection(listener net.Listener) {
 	in_conn, err := listener.Accept()
 	fmt.Println("Connection accepted on IP: ", listener.Addr().String())
 	if err != nil {
-		fmt.Println("New peer connection failed")
+		//fmt.Println("New peer connection failed")
 		return
 	}
 
@@ -439,31 +439,30 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 					continue
 				} else {
 					//this was a block
-					fmt.Println("received a block")
+					fmt.Println("received (probably) a block")
 					if demarshalled[len(demarshalled)-1] == "yeet" && peer.rsa.VerifyBlock(demarshalled, peer.seqPk) {
-						fmt.Println("Verified a demarshalled block")
+						//fmt.Println("Verified a demarshalled block")
 						peer.blocksSentMutex.Lock()
 						if !peer.blocksSent[demarshalled[len(demarshalled)-2]] {
-							fmt.Println("Got a new ID/signature of a block")
+							//fmt.Println("Got a previously unseen block")
 							peer.blocksSent[demarshalled[len(demarshalled)-2]] = true
+							go peer.sendBlockToAllPeers(marshalled)
 							blockNo, _ := strconv.Atoi(demarshalled[len(demarshalled)-3])
 							if blockNo == peer.blockCounter {
-								fmt.Println("Got the expected block number, sending the block to all peers")
+								fmt.Println("Got a new block with the expected block number, sending the block to all peers")
 								peer.blockCounter++
-								go peer.sendBlockToAllPeers(marshalled)
 								peer.UpdateLedgerWithBlock(demarshalled[:len(demarshalled)-3])
 							} else {
 								fmt.Println("Got an unexpected block number", blockNo, "expected", peer.blockCounter)
 							}
 						} else {
-							fmt.Println("Got an old ID/signature of a block")
+							fmt.Println("Got an block that's seen before")
 						}
 						peer.blocksSentMutex.Unlock()
 					} else {
 						fmt.Println("Rejected a block")
 					}
 				}
-
 			}
 		} else {
 			//demarshalled a transaction - adding message to channel

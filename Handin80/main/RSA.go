@@ -191,7 +191,7 @@ func Sign(filename string, password string, msg []byte) (string, error) {
 	read_bytes, err := os.ReadFile(filename)
 
 	if err != nil {
-		return "Yo wtf", errors.New("Tried to read non-existing file")
+		return "Yo wtf", errors.New("tried to read non-existing file")
 	}
 
 	hashedPW := Hash(password).Bytes()
@@ -212,7 +212,7 @@ func Sign(filename string, password string, msg []byte) (string, error) {
 
 	} else {
 		//error
-		return "That ain't it, Chief", errors.New("Invalid password")
+		return "That ain't it, Chief", errors.New("invalid password")
 	}
 }
 func ConvertKeyToBigInts(publicKey string) (*big.Int, *big.Int) {
@@ -225,7 +225,8 @@ func ConvertKeyToBigInts(publicKey string) (*big.Int, *big.Int) {
 }
 
 func (rsa *RSA) FullSignBlock(block Block, keyN big.Int, keyD big.Int) Block {
-	stringToSign := strings.Join(block, "")
+	stringToSign := strings.Join(block, ":")
+	fmt.Println("The string to sign:", stringToSign)
 	signature := ConvertBigIntToString(rsa.FullSign(stringToSign, keyN, keyD))
 	block = append(block, signature)
 	return block
@@ -234,7 +235,7 @@ func (rsa *RSA) FullSignBlock(block Block, keyN big.Int, keyD big.Int) Block {
 func (rsa *RSA) VerifyBlock(block Block, keyN string) bool {
 	signature := ConvertStringToBigInt(block[len(block)-2])
 	block = block[:len(block)-2] //-2 because we also append the delimiter in the block
-	stringToVerify := strings.Join(block, "")
+	stringToVerify := strings.Join(block, ":")
 
 	keyNreal := *ConvertStringToBigInt(keyN)
 
