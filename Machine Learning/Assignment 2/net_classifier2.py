@@ -38,13 +38,6 @@ def softmax(X):
     """
     res = np.zeros(X.shape)
     ### YOUR CODE HERE
-    maxes = (np.amax(X, axis=1))[:, np.newaxis]
-    lessMax_X = X - maxes
-    exp_X = np.exp(lessMax_X)
-    sum_X = np.sum(exp_X, axis=1)[:, np.newaxis] 
-    log_X = np.log(sum_X) + maxes
-    res = X - log_X
-    res = np.exp(res)
     ### END CODE
     return res
 
@@ -58,8 +51,6 @@ def relu(x):
         Beware of np.max and look at np.maximum
     """
     ### YOUR CODE HERE
-    res = np.maximum(x, np.zeros(x.shape))
-    assert res.shape == x.shape
     ### END CODE
     return res
 
@@ -105,14 +96,6 @@ class NetClassifier():
             params = self.params
         pred = None
         ### YOUR CODE HERE
-        W1 = params['W1']
-        b1 = params['b1']
-        W2 = params['W2']
-        b2 = params['b2']
-        output1 = relu(X @ W1 + b1)
-        output2 = output1 @ W2 + b2
-        probabilities = softmax(output2) #Might have to remove this line?
-        pred = np.argmax(probabilities, axis=1) 
         ### END CODE
         return pred
      
@@ -131,8 +114,6 @@ class NetClassifier():
             params = self.params
         acc = None
         ### YOUR CODE HERE
-        prediction = self.predict(X, params)
-        acc = np.mean(prediction == y)
         ### END CODE
         return acc
     
@@ -166,79 +147,14 @@ class NetClassifier():
         W2 = params['W2']
         b2 = params['b2']
         labels = one_in_k_encoding(y, W2.shape[1]) # shape n x k
-        #print("W1 dim:", W1.shape)
-        #print("b1 dim:", b1.shape)
-        #print("W2 dim:", W2.shape)
-        #print("b2 dim:", b2.shape)
-        #print("labels dim:", labels.shape)
                         
         ### YOUR CODE HERE - FORWARD PASS - compute cost with weight decay and store relevant values for backprop
-        nll = np.zeros(X.shape[0])
-        #Summy bois:
-        W1_grad = np.zeros(W1.shape)
-        W2_grad = np.zeros(W2.shape)
-        b1_grad = np.zeros(b1.shape)
-        b2_grad = np.zeros(b2.shape)
-        lambd = c
-        for i in range(X.shape[0]):
-            #Forward pass
-            currentRow = X[i,:]
-            #print("currentrow:", currentRow)
-            #print("W1:", W1)
-            a = currentRow @ W1
-            b = a + b1
-            rel = relu(b)[0]
-            d = rel @ W2
-            e = d + b2
-            softmaxVec = softmax(e)[0]
-            probability = softmaxVec[y[i]]
-            f = -np.log(probability)
-            nll[i] = f #Cost
-            
-            #Backward pass
-            print("labels", labels)
-            print("labels[i,:]", labels[i,:])
-            df_de = (softmaxVec - labels[i])
-            df_db2 = df_de
-            df_dd = df_de
-            df_dc = df_dd @ W2.T
-            print("c: ", rel)
-            print("c newaxis: ", rel[:, np.newaxis])
-            print("df_de:", df_de)
-            df_dw2 = rel[:, np.newaxis] @ df_dd[:,np.newaxis].T 
-            print("df_dw2:", df_dw2)
-            dc_db = np.diag(rel > 0).astype(int) #Numerisk sikker hertil
-            print("dc_db", dc_db)
-            df_db = df_dc @ dc_db
-            df_da = df_db
-            df_db1 = df_db
-            df_dw1 = currentRow[:, np.newaxis] @ df_da[:,np.newaxis].T      
-
-            W1_grad += df_dw1  
-            W2_grad += df_dw2 
-            b1_grad += df_db1
-            b2_grad += df_db2
-
-        #print("lambd:", lambd)
-        b2_grad = -b2_grad /X.shape[0]
-        b1_grad = -b1_grad /X.shape[0]
-        W1_grad = -W1_grad /X.shape[0]
-        W2_grad = -W2_grad /X.shape[0]
-        dweight_dw1 = lambd * 2 * W1
-        dweight_dw2 = lambd * 2 * W2
-        W1_grad += dweight_dw1
-        W2_grad += dweight_dw2
-
         ### END CODE
-
-        ### YOUR CODE HERE - BACKWARDS PASS - compute derivatives of all weights and bias, store them in d_w1, d_w2, d_b1, d_b2
         
-            #nothin' to see here... *crickets*
-        
+        ### YOUR CODE HERE - BACKWARDS PASS - compute derivatives of all weights and bias, store them in d_w1, d_w2' d_w2, d_b1, d_b2
         ### END CODE
         # the return signature
-        loss = -np.mean(nll) + c * (np.sum(W1**2) + np.sum(W2**2))
-        return loss, {'d_w1': W1_grad, 'd_w2': W2_grad, 'd_b1': b1_grad, 'd_b2': b2_grad}
+        return None, {'d_w1': None, 'd_w2': None, 'd_b1': None, 'd_b2': None}
         
     def fit(self, X_train, y_train, X_val, y_val, init_params, batch_size=32, lr=0.1, c=1e-4, epochs=30):
         """ Run Mini-Batch Gradient Descent on data X, Y to minimize the in sample error for Neural Net classification
@@ -273,52 +189,8 @@ class NetClassifier():
             'val_acc': None, 
         }
 
+        
         ### YOUR CODE HERE
-        n = X_train.shape[0]
-        train_loss = np.zeros[epochs]
-        train_acc = np.zeros[epochs]
-        val_loss = np.zeros[epochs]
-        val_acc = np.zeros[epochs]
-        params = {'W1': None, 'b1': None, 'W2': None, 'b2': None}
-        for i in range(epochs):
-            Xpermuted, Ypermuted = permute(X_train, y_train)
-            batchesX = [Xpermuted[i:i+batch_size] for i in range(0, n, batch_size)]
-            batchesY = [Ypermuted[i:i+batch_size] for i in range(0, n, batch_size)]
-            for j in range(len(batchesX)):
-                currentX = batchesX[j]
-                currentY = batchesY[j]
-                _, grad = self.cost_grad(currentX, currentY, c)
-                W1 = W1 - lr * grad['d_w1']
-                b1 = b1 - lr * grad['d_b1']
-                W2 = W2 - lr * grad['d_w2']
-                b2 = b2 - lr * grad['d_b2']
-
-            params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
-            
-            costTrain, _ =  self.cost_grad(X_train, y_train, c)
-            train_loss[i] = costTrain 
-            scoreTrain = self.score(X_train, y_train, params)   
-            train_acc[i] = scoreTrain
-            
-            costVal, _ =  self.cost_grad(X_val, y_val)
-            val_loss[i] = costVal
-            scoreVal = self.score(X_val, y_val, params)
-            val_acc[i] = scoreVal
-            
-            print("Epoch ", i)
-            print("Train_loss", costTrain)
-            print("Train_acc", scoreTrain)
-            print("Val_loss", costVal)
-            print("Val_acc", scoreVal)
-        
-        hist = { 
-            'train_loss': train_loss,
-            'train_acc': train_acc,
-            'val_loss': val_loss,
-            'val_acc': val_acc, 
-        }
-        self.params = params
-        
         ### END CODE
         # hist dict should look like this with something different than none
         #hist = {'train_loss': None, 'train_acc': None, 'val_loss': None, 'val_acc': None}
@@ -326,16 +198,6 @@ class NetClassifier():
         # self.params = {'W1': None, 'b1': None, 'W2': None, 'b2': None}
         return hist
         
-def permute(X, y):
-    assert y.shape[0] == X.shape[0]
-    xy = np.hstack((X,y[:, np.newaxis]))
-    perm = np.random.permutation(xy)
-    perm_y = perm[:,-1]
-    perm_x = perm[:,:-1]
-    assert y.shape == perm_y.shape
-    assert X.shape == perm_x.shape
-    return perm_x, perm_y
-
 
 def numerical_grad_check(f, x, key):
     """ Numerical Gradient Checker """
@@ -374,20 +236,17 @@ def test_grad():
     y = np.array([0, 1, 2, 0, 1, 2, 0])
 
     f = lambda z: nc.cost_grad(X, y, params, c=1.0)
-
-
     print('\n', stars, 'Test Cost and Gradient of b2', stars)
     numerical_grad_check(f, params['b2'], 'd_b2')
     print(stars, 'Test Success', stars)
-    
-    print('\n', stars, 'Test Cost and Gradient of b1', stars)
-    numerical_grad_check(f, params['b1'], 'd_b1')
-    print('Test Success')
     
     print('\n', stars, 'Test Cost and Gradient of w2', stars)
     numerical_grad_check(f, params['W2'], 'd_w2')
     print('Test Success')
     
+    print('\n', stars, 'Test Cost and Gradient of b1', stars)
+    numerical_grad_check(f, params['b1'], 'd_b1')
+    print('Test Success')
     
     print('\n', stars, 'Test Cost and Gradient of w1', stars)
     numerical_grad_check(f, params['W1'], 'd_w1')
