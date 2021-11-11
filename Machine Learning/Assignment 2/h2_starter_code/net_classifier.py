@@ -199,7 +199,7 @@ class NetClassifier():
             nll[i] = f
             
             #Backward pass
-
+            
             df_de = (softmaxVec - labels[i,:])/X.shape[0]
             df_db2 = df_de
             df_dc = df_de @ W2.T
