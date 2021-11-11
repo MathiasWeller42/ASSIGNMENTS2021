@@ -50,7 +50,6 @@ func (this_aes *AES) generateAESKey() []byte {
 }
 
 /*
-
 func main() {
 	fmt.Println("First we test RSA encryption on its own")
 	RunRSA()

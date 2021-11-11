@@ -179,9 +179,9 @@ class NetClassifier():
         W2_grad = np.zeros(W2.shape)
         b1_grad = np.zeros(b1.shape)
         b2_grad = np.zeros(b2.shape)
-
         lambd = c
         for i in range(X.shape[0]):
+            #print("i: ", i)
             #Forward pass
             currentRow = X[i,:]
             a = currentRow @ W1
@@ -190,37 +190,27 @@ class NetClassifier():
             d = c @ W2
             e = d + b2
             softmaxVec = softmax(e)[0]
-            print("softmaxVex vals", softmaxVec)
             probability = softmaxVec[Y[i]]
-            #print("probability shape:", probability.shape)
             f = -np.log(probability)
-            #print("f val", f)
             nll[i] = f
-            #print("Shape of c[:, np.newaxis]:", c[:, np.newaxis].shape)
             
             #Backward pass
+
             df_de = softmaxVec - labels[i,:]
             df_db2 = df_de
-            #print("df_de shape", df_de.shape)
             df_dc = df_de @ W2.T
-            #print("df_dc shape", df_dc.shape)
-            #print("c shape", c.shape)
-            #print("c[0] shape", c[0].shape)
-            df_dw2 = c[:,np.newaxis] * df_de #<-- Anna is responsible
-            #print("df_dw2 shape", df_dw2.shape)
+            df_dw2 = c[:,np.newaxis] * df_de 
             dc_db = np.diag(c > 0)
-            #print("dc_db:", dc_db)
             df_db = df_dc @ dc_db
             df_da = df_db
             df_db1 = df_db
-            #print("df_db",df_db)
-            df_dw1 = currentRow[:, np.newaxis] * df_da #<-- Anna is (very, incredibly) responsible      
+            df_dw1 = currentRow[:, np.newaxis] * df_da      
 
             W1_grad += df_dw1  
             W2_grad += df_dw2
             b1_grad += df_db1
             b2_grad += df_db2
-        
+        #print("lambd:", lambd)
         dweight_dw1 = lambd * 2 * W1
         dweight_dw2 = lambd * 2 * W2
         W1_grad += dweight_dw1
@@ -269,7 +259,7 @@ class NetClassifier():
             'val_acc': None, 
         }
 
-        ### YOUR CODE HERE - OBS vi bruger ikke weight decay parameteren!!!
+        ### YOUR CODE HERE
         n = X_train.shape[0]
         train_loss = np.zeros[epochs]
         train_acc = np.zeros[epochs]
@@ -340,10 +330,12 @@ def numerical_grad_check(f, x, key):
     # d = x.shape[0]
     cost, grad = f(x)
     grad = grad[key]
+    num_grads = []
+    print("Grad: ", grad)
     it = np.nditer(x, flags=['multi_index'])
     while not it.finished:    
         dim = it.multi_index    
-        print(dim)
+        #print(dim)
         tmp = x[dim]
         x[dim] = tmp + h
         cplus, _ = f(x)
@@ -351,10 +343,12 @@ def numerical_grad_check(f, x, key):
         cminus, _ = f(x)
         x[dim] = tmp
         num_grad = (cplus-cminus)/(2*h)
-        # print('cplus cminus', cplus, cminus, cplus-cminus)
-        # print('dim, grad, num_grad, grad-num_grad', dim, grad[dim], num_grad, grad[dim]-num_grad)
-        assert np.abs(num_grad - grad[dim]) < eps, 'numerical gradient error index {0}, numerical gradient {1}, computed gradient {2}'.format(dim, num_grad, grad[dim])
+        print('cplus cminus', cplus, cminus, cplus-cminus)
+        print('dim, grad, num_grad, grad-num_grad', dim, grad[dim], num_grad, grad[dim]-num_grad)
+        #assert np.abs(num_grad - grad[dim]) < eps, 'numerical gradient error index {0}, numerical gradient {1}, computed gradient {2}'.format(dim, num_grad, grad[dim])
+        num_grads.append(num_grad)
         it.iternext()
+    print("num_grads:", num_grads)
 
 def test_grad():
     stars = '*'*5
@@ -388,28 +382,49 @@ def test_grad():
 
 if __name__ == '__main__':
     
-    input_dim = 3
+    '''input_dim = 3
     hidden_size = 5
     output_size = 4
     batch_size = 1
     nc = NetClassifier()
     params = {'W1': np.ones([3,5]), 'b1': np.ones([1,5]), 'W2': np.ones([5,4]), 'b2':np.ones([1,4]) }
-    X = np.array([[1,2,3],[4,5,6],[7,8,9]])
-    Y = np.array([0, 1, 2])
-    loss, newParams = nc.cost_grad(X,Y,params,c=0)
+    X = np.array([[1,2,3]])
+    Y = np.array([2])
+    #loss, newParams = nc.cost_grad(X,Y,params,c=0)
+    #nc.cost_grad(X, Y, params, c=0)   
+    #test_grad()
+
+    stars = '*'*5
+    f = lambda z: nc.cost_grad(X, Y, params, c=1.0)
+    print('\n', stars, 'Test Cost and Gradient of b2', stars)
+    numerical_grad_check(f, params['b2'], 'd_b2')
+    print(stars, 'Test Success', stars)
+    
+    print('\n', stars, 'Test Cost and Gradient of w2', stars)
+    numerical_grad_check(f, params['W2'], 'd_w2')
+    print('Test Success')
+    
+    print('\n', stars, 'Test Cost and Gradient of b1', stars)
+    numerical_grad_check(f, params['b1'], 'd_b1')
+    print('Test Success')
+    
+    print('\n', stars, 'Test Cost and Gradient of w1', stars)
+    numerical_grad_check(f, params['W1'], 'd_w1')
+    print('Test Success')
+
     print("params", params)
     print("-----------------------------------")
     print("loss", loss)
     print("gradient W1", newParams['d_w1'])
     print("gradient W2", newParams['d_w2'])
     print("gradient b1", newParams['d_b1'])
-    print("gradient b2", newParams['d_b2'])
+    print("gradient b2", newParams['d_b2'])'''
     
     
     
     
     
-    """input_dim = 3
+    input_dim = 3
     hidden_size = 5
     output_size = 4
     batch_size = 7
@@ -420,23 +435,4 @@ if __name__ == '__main__':
     
     
     nc.cost_grad(X, Y, params, c=0)   
-    test_grad()"""
-    
-
-    """
-    W1 = params['W1']
-    b1 = params['b1']
-    W2 = params['W2']
-    b2 = params['b2']
-    layer1 = X @ W1 + b1 
-    activation1 = relu(layer1)
-    layer2 = activation1 @ W2 + b2
-    softmaxVal = softmax(layer2)
-    listOfProbabilities = [softmaxVal[i][Y[i]]for i in range(softmaxVal.shape[0])]
-    loss = -np.log(listOfProbabilities)
-    print("loss", loss)
-    print("softmaxval: ", softmaxVal)
-    print("new hope:", listOfProbabilities)
-    newsoft = activation1 > 0 
-    print("newsoft:", newsoft)
-    print("mean:", np.sum(newsoft))"""
+    test_grad()

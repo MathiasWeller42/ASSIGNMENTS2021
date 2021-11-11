@@ -384,6 +384,24 @@ func (peer *Peer) DemarshalTransaction(bytes []byte) (SignedTransaction, error) 
 	return transaction, err
 }
 
+func (peer *Peer) MarshalBlock(block Block) []byte {
+	//Signér
+	fmt.Println("Marshalling, signing and appending delimiter to block")
+	block = peer.seqRSA.FullSignBlock(block, peer.seqRSA.n, peer.seqRSA.d) //This appends the signature to the block
+	block = append(block, "yeet")                                          //Add delimiter
+	bytes, err := json.Marshal(block)
+	if err != nil {
+		fmt.Println("Marshalling block failed")
+	}
+	return bytes
+}
+
+func (peer *Peer) DemarshalBlock(bytes []byte) (Block, error) {
+	var block Block
+	err := json.Unmarshal(bytes, &block)
+	return block, err
+}
+
 func (peer *Peer) MarshalConnectionsURI(connectionsURI ConnectionsURI) []byte {
 	peer.connectionsURIMutex.Lock()
 	bytes, err := json.Marshal(connectionsURI)
