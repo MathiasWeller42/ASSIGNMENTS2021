@@ -181,40 +181,55 @@ class NetClassifier():
         b2_grad = np.zeros(b2.shape)
         lambd = c
         for i in range(X.shape[0]):
-            #print("i: ", i)
+            #print("X: ", X)
+            #print("X shape 0 ", X.shape[0])
             #Forward pass
             currentRow = X[i,:]
+            #print("currentrow:", currentRow)
+            #print("W1:", W1)
             a = currentRow @ W1
+            #print("a:", a)
             b = a + b1
             c = relu(b)[0]
             d = c @ W2
             e = d + b2
             softmaxVec = softmax(e)[0]
             probability = softmaxVec[Y[i]]
-            f = -np.log(probability)
+            f = -np.log(probability)/X.shape[0]
             nll[i] = f
             
             #Backward pass
 
-            df_de = softmaxVec - labels[i,:]
+            df_de = (softmaxVec - labels[i,:])/X.shape[0]
             df_db2 = df_de
             df_dc = df_de @ W2.T
-            df_dw2 = c[:,np.newaxis] * df_de 
+            print("c: ", c)
+            print("c newaxis: ", c[:, np.newaxis])
+            print("df_de:", df_de)
+            df_dw2 = c[:, np.newaxis] @ df_de[:,np.newaxis].T 
             dc_db = np.diag(c > 0)
             df_db = df_dc @ dc_db
             df_da = df_db
             df_db1 = df_db
-            df_dw1 = currentRow[:, np.newaxis] * df_da      
+            df_dw1 = currentRow[:, np.newaxis] @ df_da[:,np.newaxis].T      
 
             W1_grad += df_dw1  
             W2_grad += df_dw2
             b1_grad += df_db1
             b2_grad += df_db2
+
         #print("lambd:", lambd)
+        b2_grad = b2_grad 
+        b1_grad = b1_grad 
+        W1_grad = W1_grad
+        W2_grad = W2_grad
+
         dweight_dw1 = lambd * 2 * W1
         dweight_dw2 = lambd * 2 * W2
         W1_grad += dweight_dw1
         W2_grad += dweight_dw2
+
+
         ### END CODE
 
         ### YOUR CODE HERE - BACKWARDS PASS - compute derivatives of all weights and bias, store them in d_w1, d_w2, d_b1, d_b2
@@ -345,7 +360,7 @@ def numerical_grad_check(f, x, key):
         num_grad = (cplus-cminus)/(2*h)
         print('cplus cminus', cplus, cminus, cplus-cminus)
         print('dim, grad, num_grad, grad-num_grad', dim, grad[dim], num_grad, grad[dim]-num_grad)
-        #assert np.abs(num_grad - grad[dim]) < eps, 'numerical gradient error index {0}, numerical gradient {1}, computed gradient {2}'.format(dim, num_grad, grad[dim])
+        assert np.abs(num_grad - grad[dim]) < eps, 'numerical gradient error index {0}, numerical gradient {1}, computed gradient {2}'.format(dim, num_grad, grad[dim])
         num_grads.append(num_grad)
         it.iternext()
     print("num_grads:", num_grads)
