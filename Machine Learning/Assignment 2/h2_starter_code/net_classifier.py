@@ -196,7 +196,7 @@ class NetClassifier():
             df_dd = df_de
             df_dc = df_dd @ W2.T
             df_dw2 = rel[:, np.newaxis] @ df_dd[:,np.newaxis].T 
-            dc_db = np.diag(rel > 0).astype(int) #Numerisk sikker hertil
+            dc_db = np.diag(rel > 0).astype(int) 
             df_db = df_dc @ dc_db
             df_da = df_db
             df_db1 = df_db
@@ -294,11 +294,25 @@ class NetClassifier():
             val_loss[i] = costVal
             scoreVal = self.score(X_val, y_val, params)
             val_acc[i] = scoreVal
-            
+
             print("Train_loss", costTrain)
             print("Train_acc", scoreTrain)
             print("Val_loss", costVal)
             print("Val_acc", scoreVal)
+
+            #early stopping
+            if i > 0:
+                if val_acc[i] > 0.97 and (val_acc[i] - val_acc[i-1]) / val_acc[i-1] < 0.005:
+                    hist = { 
+                    'train_loss': train_loss,
+                    'train_acc': train_acc,
+                    'val_loss': val_loss,
+                    'val_acc': val_acc, 
+                    }
+                    self.params = params
+                    print("Stopping early")
+                    return hist
+            
         
         hist = { 
             'train_loss': train_loss,
