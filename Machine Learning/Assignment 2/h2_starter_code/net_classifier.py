@@ -166,11 +166,6 @@ class NetClassifier():
         W2 = params['W2']
         b2 = params['b2']
         labels = one_in_k_encoding(y, W2.shape[1]) # shape n x k
-        #print("W1 dim:", W1.shape)
-        #print("b1 dim:", b1.shape)
-        #print("W2 dim:", W2.shape)
-        #print("b2 dim:", b2.shape)
-        #print("labels dim:", labels.shape)
                         
         ### YOUR CODE HERE - FORWARD PASS - compute cost with weight decay and store relevant values for backprop
         nll = np.zeros(X.shape[0])
@@ -180,11 +175,10 @@ class NetClassifier():
         b1_grad = np.zeros(b1.shape)
         b2_grad = np.zeros(b2.shape)
         lambd = c
+
         for i in range(X.shape[0]):
             #Forward pass
             currentRow = X[i,:]
-            #print("currentrow:", currentRow)
-            #print("W1:", W1)
             a = currentRow @ W1
             b = a + b1
             rel = relu(b)[0]
@@ -193,22 +187,16 @@ class NetClassifier():
             softmaxVec = softmax(e)[0]
             probability = softmaxVec[y[i]]
             f = -np.log(probability)
-            nll[i] = f #Cost
+            #Cost
+            nll[i] = f 
             
             #Backward pass
-            print("labels", labels)
-            print("labels[i,:]", labels[i,:])
             df_de = (softmaxVec - labels[i])
             df_db2 = df_de
             df_dd = df_de
             df_dc = df_dd @ W2.T
-            print("c: ", rel)
-            print("c newaxis: ", rel[:, np.newaxis])
-            print("df_de:", df_de)
             df_dw2 = rel[:, np.newaxis] @ df_dd[:,np.newaxis].T 
-            print("df_dw2:", df_dw2)
             dc_db = np.diag(rel > 0).astype(int) #Numerisk sikker hertil
-            print("dc_db", dc_db)
             df_db = df_dc @ dc_db
             df_da = df_db
             df_db1 = df_db
@@ -219,11 +207,10 @@ class NetClassifier():
             b1_grad += df_db1
             b2_grad += df_db2
 
-        #print("lambd:", lambd)
-        b2_grad = -b2_grad /X.shape[0]
-        b1_grad = -b1_grad /X.shape[0]
-        W1_grad = -W1_grad /X.shape[0]
-        W2_grad = -W2_grad /X.shape[0]
+        b2_grad = b2_grad / X.shape[0]
+        b1_grad = b1_grad / X.shape[0]
+        W1_grad = W1_grad / X.shape[0]
+        W2_grad = W2_grad / X.shape[0]
         dweight_dw1 = lambd * 2 * W1
         dweight_dw2 = lambd * 2 * W2
         W1_grad += dweight_dw1
@@ -237,7 +224,7 @@ class NetClassifier():
         
         ### END CODE
         # the return signature
-        loss = -np.mean(nll) + c * (np.sum(W1**2) + np.sum(W2**2))
+        loss = np.mean(nll) + c * (np.sum(W1**2) + np.sum(W2**2))
         return loss, {'d_w1': W1_grad, 'd_w2': W2_grad, 'd_b1': b1_grad, 'd_b2': b2_grad}
         
     def fit(self, X_train, y_train, X_val, y_val, init_params, batch_size=32, lr=0.1, c=1e-4, epochs=30):
@@ -275,37 +262,39 @@ class NetClassifier():
 
         ### YOUR CODE HERE
         n = X_train.shape[0]
-        train_loss = np.zeros[epochs]
-        train_acc = np.zeros[epochs]
-        val_loss = np.zeros[epochs]
-        val_acc = np.zeros[epochs]
-        params = {'W1': None, 'b1': None, 'W2': None, 'b2': None}
+        train_loss = np.zeros(epochs)
+        train_acc = np.zeros(epochs)
+        val_loss = np.zeros(epochs)
+        val_acc = np.zeros(epochs)
+        params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+
+        print("Total epochs", epochs)
+
         for i in range(epochs):
+            print("Start epoch ", i)
             Xpermuted, Ypermuted = permute(X_train, y_train)
             batchesX = [Xpermuted[i:i+batch_size] for i in range(0, n, batch_size)]
-            batchesY = [Ypermuted[i:i+batch_size] for i in range(0, n, batch_size)]
+            batchesY = [Ypermuted[i:i+batch_size].astype(int) for i in range(0, n, batch_size)]
             for j in range(len(batchesX)):
                 currentX = batchesX[j]
                 currentY = batchesY[j]
-                _, grad = self.cost_grad(currentX, currentY, c)
+                _, grad = self.cost_grad(currentX, currentY, params, c=c)
                 W1 = W1 - lr * grad['d_w1']
                 b1 = b1 - lr * grad['d_b1']
                 W2 = W2 - lr * grad['d_w2']
                 b2 = b2 - lr * grad['d_b2']
-
-            params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+                params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
             
-            costTrain, _ =  self.cost_grad(X_train, y_train, c)
+            costTrain, _ =  self.cost_grad(X_train, y_train, params, c)
             train_loss[i] = costTrain 
             scoreTrain = self.score(X_train, y_train, params)   
             train_acc[i] = scoreTrain
             
-            costVal, _ =  self.cost_grad(X_val, y_val)
+            costVal, _ =  self.cost_grad(X_val, y_val, params, c=0)
             val_loss[i] = costVal
             scoreVal = self.score(X_val, y_val, params)
             val_acc[i] = scoreVal
             
-            print("Epoch ", i)
             print("Train_loss", costTrain)
             print("Train_acc", scoreTrain)
             print("Val_loss", costVal)
@@ -375,7 +364,6 @@ def test_grad():
 
     f = lambda z: nc.cost_grad(X, y, params, c=1.0)
 
-
     print('\n', stars, 'Test Cost and Gradient of b2', stars)
     numerical_grad_check(f, params['b2'], 'd_b2')
     print(stars, 'Test Success', stars)
@@ -388,10 +376,10 @@ def test_grad():
     numerical_grad_check(f, params['W2'], 'd_w2')
     print('Test Success')
     
-    
     print('\n', stars, 'Test Cost and Gradient of w1', stars)
     numerical_grad_check(f, params['W1'], 'd_w1')
     print('Test Success')
+    print("All tests succeeded")
 
 if __name__ == '__main__':
     input_dim = 3
