@@ -480,6 +480,10 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 
 func (peer *Peer) VerifyWinningBlock(block Block) bool {
 	//TODO implement this function
+	//Verify that sigma = (BLOCK, slot, (U,M), h) under vk
+	//Verify that Draw = (LOTTERY, seed, slot) under vk
+	//Verify that numTickets(vk) * Hash(Draw) >= hardness
+
 	return true
 }
 
@@ -513,7 +517,7 @@ func (peer *Peer) UpdateLedgerWithBlock(block Block) {
 }
 
 func (peer *Peer) HandleLottery() {
-	slotLength (time.Duration) := peer.slotLength
+	//slotLength := peer.slotLength
 	t := time.NewTicker(30 * time.Second)
 	for now := range t.C {
 		fmt.Println("I have to print this to make the compiler happy", now)
@@ -534,9 +538,9 @@ func (peer *Peer) EnterLottery(slot int, seed int, n big.Int, d big.Int) (bool, 
 	toHash := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slot) + ":" + nString + ":" + ConvertBigIntToString(draw)
 	hashed := Hash(toHash)
 	numTickets := big.NewInt(int64(peer.genesisLedger.Accounts[nString]))
-	val := big.NewInt(0)
+	val := big.NewInt(0) //Val(vk, slot, Draw) = accountBalance(vk) * Hash(LOTTERY, Seed, slotnumber, vk, draw), where draw = Sig_sk(LOTTERY, slot)
 	val = val.Mul(numTickets, hashed)
-	if val.Cmp(&(peer.hardness)) == 1 {
+	if val.Cmp(&(peer.hardness)) == 1 { //If val >= hardness
 		fmt.Println("Yay, I won the lottery!!!!!! Gonna quit the job")
 		return true, (ConvertBigIntToString(draw))
 	} else {
@@ -548,19 +552,20 @@ func (peer *Peer) EnterLottery(slot int, seed int, n big.Int, d big.Int) (bool, 
 func (peer *Peer) HandleWinning(draw string) {
 	//append block
 	//send out block
+	//sends message (BLOCK, vk, slotnumber, Draw, (U,M), hash, sigma=signature of (BLOCK, slot, (U,M), hash))
 	peer.nextBlockMutex.Lock()
-	block := peer.nextBlock
+	block := peer.nextBlock //TODO  - Bør vi tjekke at beskederne i nextBlock ikke er modtaget fra en anden
 	peer.nextBlock = make([]string, 0)
 	peer.nextBlockMutex.Unlock()
 
-	block = append(block, "BLOCK")
-	block = append(block, ConvertBigIntToString(&peer.rsa.n))
-	block = append(block, strconv.Itoa(peer.slotNumber))
-	block = append(block, draw)
+	block = append(block, "BLOCK")                            //BLOCK
+	block = append(block, ConvertBigIntToString(&peer.rsa.n)) //Public key / VK
+	block = append(block, strconv.Itoa(peer.slotNumber))      //Slotnumber
+	block = append(block, draw)                               //Draw
 	prevBlockHash := peer.getPrevBlockHash()
-	block = append(block, prevBlockHash)
+	block = append(block, prevBlockHash) //Hash
 	signature := peer.rsa.CreateBlockSignature(peer.slotNumber, peer.nextBlock, prevBlockHash)
-	block = append(block, signature)
+	block = append(block, signature) //Sigma
 
 	marshalled := peer.MarshalBlock(block)
 	peer.SendBlockToAllPeers(marshalled)
