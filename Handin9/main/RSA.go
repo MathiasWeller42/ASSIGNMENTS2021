@@ -143,9 +143,24 @@ func (rsa *RSA) FullSignBlock(block Block, keyN big.Int, keyD big.Int) Block {
 	return block
 }
 
-func (rsa *RSA) CreateBlockSignature(slotNumber int, nextBlock Block, prevBlockHash string) string {
-	toSign := "BLOCK" + ":" + strconv.Itoa(slotNumber) + ":" + strings.Join(nextBlock, ":") + ":" + prevBlockHash
+func (rsa *RSA) CreateBlockSignature(slotNumber int, nextBlockData Block, prevBlockHash string) string {
+	toSign := "BLOCK" + ":" + strconv.Itoa(slotNumber) + ":" + strings.Join(nextBlockData, ":") + ":" + prevBlockHash
 	return ConvertBigIntToString(rsa.FullSign(toSign, rsa.n, rsa.d))
+}
+
+//Verify that decrypting sigma with keyN gives the checkString
+func (rsa *RSA) VerifyBlockSignature(slotNumber int, nextBlockData Block, prevBlockHash string, sigma string, keyN string) bool {
+	checkString := "BLOCK" + ":" + strconv.Itoa(slotNumber) + ":" + strings.Join(nextBlockData, ":") + ":" + prevBlockHash
+	keyNreal := *ConvertStringToBigInt(keyN)
+	verified := rsa.VerifyWithKey(checkString, *ConvertStringToBigInt(sigma), keyNreal, big.NewInt(3)) //Decrypt sigma with keyNreal and check that it gives checkString
+	return verified
+}
+
+func (rsa *RSA) VerifyDraw(draw string, slotNumber int, seed int, keyN string) bool {
+	checkString := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slotNumber)
+	keyNreal := *ConvertStringToBigInt(keyN)
+	verified := rsa.VerifyWithKey(checkString, *ConvertStringToBigInt(draw), keyNreal, big.NewInt(3))
+	return verified
 }
 
 func (rsa *RSA) VerifyBlock(block Block, keyN string) bool {

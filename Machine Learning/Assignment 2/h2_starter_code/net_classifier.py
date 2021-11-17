@@ -302,7 +302,7 @@ class NetClassifier():
 
             #early stopping
             if i > 0:
-                if val_acc[i] > 0.97 and (val_acc[i] - val_acc[i-1]) / val_acc[i-1] < 0.005:
+                if val_acc[i] > 0.975 and (val_acc[i] - val_acc[i-1]) / val_acc[i-1] < 0.005:
                     hist = { 
                     'train_loss': train_loss,
                     'train_acc': train_acc,

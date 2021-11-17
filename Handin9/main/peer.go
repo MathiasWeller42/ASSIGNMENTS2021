@@ -454,7 +454,7 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 								peer.genesisBlock = demarshalled[:len(demarshalled)-2]
 								peer.HandleGenesisBlock()
 								peer.slotNumber += 1
-							} else if peer.VerifyWinningBlock(demarshalled[:len(demarshalled)-2]) { //check at vedkommende har vundet lotteriet
+							} else if VerifyWinningBlock(*peer.rsa, demarshalled[:len(demarshalled)-2], peer.seed) { //check at vedkommende har vundet lotteriet TODO fjernede peer
 								fmt.Println("Verified a winning block, adding to ledger")
 								peer.UpdateLedgerWithBlock(demarshalled)
 
@@ -478,12 +478,30 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 	}
 }
 
-func (peer *Peer) VerifyWinningBlock(block Block) bool {
+func VerifyWinningBlock(rsa RSA, block Block, seed int) bool {
 	//TODO implement this function
-	//Verify that sigma = (BLOCK, slot, (U,M), h) under vk
+	//Verify that sigma = (BLOCK, slot, (U,M), h) under vk - check
 	//Verify that Draw = (LOTTERY, seed, slot) under vk
 	//Verify that numTickets(vk) * Hash(Draw) >= hardness
 
+	sigma := block[len(block)-3]
+	hash := block[len(block)-4]
+	draw := block[len(block)-5]
+	slotNumber, _ := strconv.Atoi(block[len(block)-6])
+	publicKey := block[len(block)-7]
+	//blockConst := block[len(block)-8] //The string "BLOCK"
+	blockTransactions := block[:len(block)-8]
+
+	sigmaCheck := rsa.VerifyBlockSignature(slotNumber, blockTransactions, hash, sigma, publicKey)
+	drawCheck := rsa.VerifyDraw(draw, slotNumber, seed, publicKey)
+	if !sigmaCheck {
+		fmt.Println("Sigmacheck failed")
+		return false
+	} else if !drawCheck {
+		fmt.Println("Drawcheck failed")
+		return false
+	}
+	fmt.Println("Sigmacheck success")
 	return true
 }
 
@@ -535,7 +553,7 @@ func (peer *Peer) EnterLottery(slot int, seed int, n big.Int, d big.Int) (bool, 
 	toSign := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slot)
 	draw := peer.rsa.FullSign(toSign, n, d)
 	nString := ConvertBigIntToString(&n)
-	toHash := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slot) + ":" + nString + ":" + ConvertBigIntToString(draw)
+	toHash := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slot) + ":" + nString + ":" + ConvertBigIntToString(draw) //entry into lottery
 	hashed := Hash(toHash)
 	numTickets := big.NewInt(int64(peer.genesisLedger.Accounts[nString]))
 	val := big.NewInt(0) //Val(vk, slot, Draw) = accountBalance(vk) * Hash(LOTTERY, Seed, slotnumber, vk, draw), where draw = Sig_sk(LOTTERY, slot)
@@ -555,6 +573,7 @@ func (peer *Peer) HandleWinning(draw string) {
 	//sends message (BLOCK, vk, slotnumber, Draw, (U,M), hash, sigma=signature of (BLOCK, slot, (U,M), hash))
 	peer.nextBlockMutex.Lock()
 	block := peer.nextBlock //TODO  - Bør vi tjekke at beskederne i nextBlock ikke er modtaget fra en anden
+	blockData := peer.nextBlock
 	peer.nextBlock = make([]string, 0)
 	peer.nextBlockMutex.Unlock()
 
@@ -564,7 +583,7 @@ func (peer *Peer) HandleWinning(draw string) {
 	block = append(block, draw)                               //Draw
 	prevBlockHash := peer.getPrevBlockHash()
 	block = append(block, prevBlockHash) //Hash
-	signature := peer.rsa.CreateBlockSignature(peer.slotNumber, peer.nextBlock, prevBlockHash)
+	signature := peer.rsa.CreateBlockSignature(peer.slotNumber, blockData, prevBlockHash)
 	block = append(block, signature) //Sigma
 
 	marshalled := peer.MarshalBlock(block)
