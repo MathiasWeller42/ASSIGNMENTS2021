@@ -1,5 +1,11 @@
 package main
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 type BlockTreeNode struct {
 	Block         string
 	VK            string
@@ -11,14 +17,24 @@ type BlockTreeNode struct {
 	TreeNodeSig   string
 }
 
-func MakeBlockTreeNode(vk string, slot int, draw string, blockData Block, ownBlockHash string, prevBlockHash string, signature string) *BlockTreeNode {
+//TODO FIX DO SHIT NOW Something is wrong when we try to add to a block that is not genesis - child goes missing... AMBER ALERT!!!
+
+func MakeBlockTreeNode(vk string, slot int, draw string, blockData Block, prevBlockHash string, signature string) *BlockTreeNode {
 	blockTreeNode := new(BlockTreeNode)
+
+	if slot == 0 {
+		blockTreeNode.OwnBlockHash = "genesis"
+		fmt.Println("Nice, I'm the genesis block!")
+	} else {
+		stringToHash := "BLOCK" + ":" + vk + ":" + strconv.Itoa(slot) + ":" + draw + ":" + strings.Join(blockData, ":") + ":" + prevBlockHash + ":" + signature
+		blockTreeNode.OwnBlockHash = ConvertBigIntToString(Hash(stringToHash))
+	}
+
 	blockTreeNode.Block = "BLOCK"
 	blockTreeNode.VK = vk
 	blockTreeNode.Slot = slot
 	blockTreeNode.Draw = draw
 	blockTreeNode.BlockData = blockData
-	blockTreeNode.OwnBlockHash = ownBlockHash
 	blockTreeNode.PrevBlockHash = prevBlockHash
 	blockTreeNode.TreeNodeSig = signature
 	return blockTreeNode

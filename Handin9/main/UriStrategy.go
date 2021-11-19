@@ -16,15 +16,10 @@ type CommandLineUriStrategy struct {
 func (uriStrategy *CommandLineUriStrategy) GetURI() string {
 	scanner := bufio.NewScanner(os.Stdin)
 
-	fmt.Println("Please enter an IP address:")
+	fmt.Println("Please enter an IP address and port separated by ':' :")
 	scanner.Scan()
-	ip := scanner.Text()
+	uri := scanner.Text()
 
-	fmt.Println("Please enter port: ")
-	scanner.Scan()
-	port := scanner.Text()
-
-	uri := ip + ":" + port
 	return uri
 }
 

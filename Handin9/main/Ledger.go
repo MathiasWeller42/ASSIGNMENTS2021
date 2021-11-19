@@ -16,7 +16,7 @@ func MakeLedger() *Ledger {
 	return ledger
 }
 
-func (l *Ledger) Transaction(t *SignedTransaction) {
+func (l *Ledger) Transaction(t *SignedTransaction) bool {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -30,8 +30,16 @@ func (l *Ledger) Transaction(t *SignedTransaction) {
 		l.Accounts[t.To] = 0
 	}
 
-	l.Accounts[t.From] -= t.Amount
-	l.Accounts[t.To] += (t.Amount - 1)
+	fromBalance := l.Accounts[t.From]
+
+	if fromBalance >= t.Amount {
+		l.Accounts[t.From] -= t.Amount
+		l.Accounts[t.To] += (t.Amount - 1)
+		return true
+	} else {
+		return false
+	}
+
 }
 
 func (l *Ledger) Print() {
@@ -39,8 +47,8 @@ func (l *Ledger) Print() {
 	defer l.lock.Unlock()
 
 	fmt.Println("Ledger state:")
-	for acc, balance := range l.Accounts {
-		fmt.Println("Account", acc, "has balance", balance, "AU")
+	for _, balance := range l.Accounts {
+		fmt.Println("Account has balance", balance, "AU")
 	}
 }
 
@@ -55,6 +63,9 @@ func (l *Ledger) GiveRewardForStake(publicKey string, noOfTransactions int) {
 }
 
 func (l *Ledger) AddAccount(newAcc string) bool {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
 	_, from_exists := l.Accounts[newAcc]
 	if !from_exists {
 		l.Accounts[newAcc] = 0
@@ -64,6 +75,9 @@ func (l *Ledger) AddAccount(newAcc string) bool {
 }
 
 func (l *Ledger) AddGenesisAccount(newAcc string) bool {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
 	_, from_exists := l.Accounts[newAcc]
 	if !from_exists {
 		l.Accounts[newAcc] = 1000000
