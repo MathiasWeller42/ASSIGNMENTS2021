@@ -31,7 +31,7 @@ func (l *Ledger) Transaction(t *SignedTransaction) {
 	}
 
 	l.Accounts[t.From] -= t.Amount
-	l.Accounts[t.To] += t.Amount
+	l.Accounts[t.To] += (t.Amount - 1)
 }
 
 func (l *Ledger) Print() {
@@ -42,6 +42,16 @@ func (l *Ledger) Print() {
 	for acc, balance := range l.Accounts {
 		fmt.Println("Account", acc, "has balance", balance, "AU")
 	}
+}
+
+func (l *Ledger) GiveRewardForStake(publicKey string, noOfTransactions int) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	reward := 10 + noOfTransactions
+	fmt.Println("Awarding the block creator ", publicKey, ", ", reward, "AU for that amount of transactions in block + 10")
+
+	l.Accounts[publicKey] += reward
 }
 
 func (l *Ledger) AddAccount(newAcc string) bool {

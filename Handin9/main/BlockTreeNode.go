@@ -6,17 +6,19 @@ type BlockTreeNode struct {
 	Slot          int
 	Draw          string
 	BlockData     Block
+	OwnBlockHash  string
 	PrevBlockHash string
 	TreeNodeSig   string
 }
 
-func MakeBlockTreeNode(vk string, slot int, draw string, block Block, prevBlockHash string, signature string) *BlockTreeNode {
+func MakeBlockTreeNode(vk string, slot int, draw string, blockData Block, ownBlockHash string, prevBlockHash string, signature string) *BlockTreeNode {
 	blockTreeNode := new(BlockTreeNode)
 	blockTreeNode.Block = "BLOCK"
 	blockTreeNode.VK = vk
 	blockTreeNode.Slot = slot
 	blockTreeNode.Draw = draw
-	blockTreeNode.BlockData = block
+	blockTreeNode.BlockData = blockData
+	blockTreeNode.OwnBlockHash = ownBlockHash
 	blockTreeNode.PrevBlockHash = prevBlockHash
 	blockTreeNode.TreeNodeSig = signature
 	return blockTreeNode

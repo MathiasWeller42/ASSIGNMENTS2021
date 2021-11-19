@@ -157,7 +157,13 @@ func (rsa *RSA) VerifyBlockSignature(slotNumber int, nextBlockData Block, prevBl
 }
 
 func (rsa *RSA) VerifyDraw(draw string, slotNumber int, seed int, keyN string) bool {
+	fmt.Println("Verifying draw: ")
+	fmt.Println("slotNumber: ", slotNumber)
+	fmt.Println("seed: ", seed)
+	fmt.Println("keyN: ", keyN)
+
 	checkString := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slotNumber)
+	fmt.Println("checkString", checkString)
 	keyNreal := *ConvertStringToBigInt(keyN)
 	verified := rsa.VerifyWithKey(checkString, *ConvertStringToBigInt(draw), keyNreal, big.NewInt(3))
 	return verified
@@ -176,7 +182,9 @@ func (rsa *RSA) VerifyBlock(block Block, keyN string) bool {
 
 func (rsa *RSA) VerifyWithKey(m string, s big.Int, keyN big.Int, keyE *big.Int) bool {
 	decryptedSignature := rsa.EncryptWithKey(&s, keyN, keyE)
+	fmt.Println("drawstring:", decryptedSignature)
 	hashed := Hash(m)
+	fmt.Println("checkString:", rsa.FullSign(m, keyN, *keyE))
 	var verified bool
 	if bytes.Equal(hashed.Bytes(), decryptedSignature.Bytes()) {
 		verified = true

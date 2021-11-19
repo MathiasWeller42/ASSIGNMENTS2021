@@ -55,6 +55,7 @@ type Peer struct {
 	slotLength             int
 	slotNumber             int
 	connectionThreshold    int
+	blockTree              *BlockTree
 }
 
 func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrategy, message MessageSendingStrategy) *Peer {
@@ -81,9 +82,10 @@ func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrate
 	peer.seed = 0
 	peer.blocksSent = make(map[string]bool)
 	peer.blocksSentMutex = &sync.Mutex{}
-	peer.slotLength = 30
+	peer.slotLength = 1
 	peer.slotNumber = 0
 	peer.connectionThreshold = 2
+	peer.blockTree = nil //TODO: initialize in handleGenesisBlock
 	return peer
 }
 
@@ -100,6 +102,8 @@ func main() {
 func (peer *Peer) run() {
 	//ask for IP and port of an existing peer via user input or other strategy
 	otherURI := peer.GetURI()
+
+	peer.AddNewSkUser()
 
 	//connect to the given IP and port via TCP
 	conn := peer.JoinNetwork(otherURI)
@@ -246,6 +250,11 @@ func (peer *Peer) HandleGenesisBlock() {
 
 	fmt.Println("Received seed", peer.seed)
 	fmt.Println("Received hardness", peer.hardness)
+
+	//TODO: initialize blocktree correctly
+	//vk string, slot int, draw string, blockData Block, ownBlockHash string, prevBlockHash string, signature string
+	genesisNode := MakeBlockTreeNode("vk", 0, "draw", peer.genesisBlock, "ownBlockHash", "prevBlockHash", "signature")
+	peer.blockTree = MakeBlockTree(*genesisNode)
 
 	go peer.HandleLottery()
 }
@@ -403,7 +412,7 @@ func (peer *Peer) RemoveURI(slice []string, s int) []string {
 
 //only used for manual testing
 func (peer *Peer) HandleIncomingFromUser() {
-	peer.AddNewSkUser()
+	//peer.AddNewSkUser()
 	for {
 		msg := peer.userInputStrategy.HandleIncomingFromUser()
 		peer.outbound <- msg
@@ -454,7 +463,7 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 								peer.genesisBlock = demarshalled[:len(demarshalled)-2]
 								peer.HandleGenesisBlock()
 								peer.slotNumber += 1
-							} else if VerifyWinningBlock(*peer.rsa, demarshalled[:len(demarshalled)-2], peer.seed) { //check at vedkommende har vundet lotteriet TODO fjernede peer
+							} else if peer.VerifyWinningBlock(*peer.rsa, demarshalled, peer.seed) { //check at vedkommende har vundet lotteriet TODO fjernede peer
 								fmt.Println("Verified a winning block, adding to ledger")
 								peer.UpdateLedgerWithBlock(demarshalled)
 
@@ -478,12 +487,12 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 	}
 }
 
-func VerifyWinningBlock(rsa RSA, block Block, seed int) bool {
+func (peer *Peer) VerifyWinningBlock(rsa RSA, block Block, seed int) bool {
 	//TODO implement this function
 	//Verify that sigma = (BLOCK, slot, (U,M), h) under vk - check
 	//Verify that Draw = (LOTTERY, seed, slot) under vk
 	//Verify that numTickets(vk) * Hash(Draw) >= hardness
-
+	fmt.Println("entire block:", block)
 	sigma := block[len(block)-3]
 	hash := block[len(block)-4]
 	draw := block[len(block)-5]
@@ -502,7 +511,19 @@ func VerifyWinningBlock(rsa RSA, block Block, seed int) bool {
 		return false
 	}
 	fmt.Println("Sigmacheck success")
-	return true
+
+	drawHash := Hash(draw)
+	peer.ledger.lock.Lock()
+	dolladollabills := big.NewInt(int64(peer.ledger.Accounts[publicKey]))
+	peer.ledger.lock.Unlock()
+	x := big.NewInt(0)
+	x.Mul(dolladollabills, drawHash)
+	if x.Cmp(&(peer.hardness)) == 1 {
+		peer.ledger.GiveRewardForStake(publicKey, len(blockTransactions))
+		return true
+	} else {
+		return false
+	}
 }
 
 func (peer *Peer) UpdateLedger(transaction *SignedTransaction) bool {
@@ -536,23 +557,26 @@ func (peer *Peer) UpdateLedgerWithBlock(block Block) {
 
 func (peer *Peer) HandleLottery() {
 	//slotLength := peer.slotLength
-	t := time.NewTicker(30 * time.Second)
+	t := time.NewTicker(1 * time.Second)
 	for now := range t.C {
-		fmt.Println("I have to print this to make the compiler happy", now)
+		fmt.Println(" ")
+		fmt.Println("Time:", now)
 		won, draw := peer.EnterLottery(peer.slotNumber, peer.seed, peer.rsa.n, peer.rsa.d)
-		peer.slotNumber += 1
 		fmt.Println("Slotnumber is:", peer.slotNumber)
 		if won {
 			fmt.Println("Won slot: ", peer.slotNumber)
 			peer.HandleWinning(draw)
 		}
+		peer.slotNumber += 1
 	}
 }
 
 func (peer *Peer) EnterLottery(slot int, seed int, n big.Int, d big.Int) (bool, string) {
 	toSign := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slot)
+	fmt.Println("toSign:", toSign)
 	draw := peer.rsa.FullSign(toSign, n, d)
 	nString := ConvertBigIntToString(&n)
+	fmt.Println("nString: ", nString)
 	toHash := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(slot) + ":" + nString + ":" + ConvertBigIntToString(draw) //entry into lottery
 	hashed := Hash(toHash)
 	numTickets := big.NewInt(int64(peer.genesisLedger.Accounts[nString]))
@@ -623,12 +647,13 @@ func (peer *Peer) MakeGenesisBlock() Block {
 	rand.Seed(time.Now().UnixNano())
 	seed := rand.Int()
 	block = append(block, strconv.Itoa(seed))
-	/*
-		x := big.NewInt(0)
-		x.Exp(big.NewInt(2), big.NewInt(276))
-		hardness := ConvertBigIntToString(x)
-	*/
-	hardness := "10000" // TODO: find a good hardness
+
+	//Calculating hardness
+	x := big.NewInt(0)
+	x.Exp(big.NewInt(2), big.NewInt(271), nil)
+	x.Mul(x, big.NewInt(30))
+	hardness := ConvertBigIntToString(x)
+
 	block = append(block, hardness)
 
 	return block

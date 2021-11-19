@@ -131,6 +131,7 @@ func TestSignVerifyBlock(t *testing.T) {
 
 func TestVerifyWinningBlock(t *testing.T) {
 	rsa := MakeRSA(2000)
+	peer := peerFixtureRSA(*rsa)
 	n := rsa.n
 	d := rsa.d
 	seed := 123456789
@@ -159,11 +160,52 @@ func TestVerifyWinningBlock(t *testing.T) {
 	fmt.Println("block:", block)
 	//Block is finalized
 
-	res := VerifyWinningBlock(*rsa, block, seed)
+	res := peer.VerifyWinningBlock(*rsa, block, seed)
 	if !res {
 		fmt.Println("Verification failed")
 	} else {
 		fmt.Println("Verification success")
 	}
 
+}
+
+func TestHardnessWinning(t *testing.T) {
+	rsa := MakeRSA(2000)
+	n := rsa.n
+	d := rsa.d
+	seed := 123456789
+	wins := 0
+	runs := 2000
+	hardness := big.NewInt(0)
+	hardness.Exp(big.NewInt(2), big.NewInt(271), nil)
+	hardness.Mul(hardness, big.NewInt(30))
+
+	for i := 0; i < runs; i++ {
+		toSign := "LOTTERY:" + strconv.Itoa(seed) + ":" + strconv.Itoa(i) //seed, slot
+		draw := ConvertBigIntToString(rsa.FullSign(toSign, n, d))
+		drawHash := Hash(draw)
+		PKaccount := big.NewInt(1000000)
+
+		y := big.NewInt(0)
+		y.Mul(PKaccount, drawHash)
+		if y.Cmp(hardness) == 1 {
+			wins = wins + 1
+		}
+	}
+	fmt.Println("Number of wins:", wins)
+	fmt.Println("Percentage of wins: ", float64(wins)/float64(runs)*100, "%")
+}
+
+func peerFixtureRSA(rsa RSA) *Peer {
+	transaction := MakeSignedTransaction("acc1", "acc2", 100, "yeet")
+
+	fixedUriStrategy := MakeFixedUriStrategy("123", "123")
+	fixedInputStrategy := MakeFixedInputStrategy(*transaction)
+	fixedOutboundIPStrategy := MakeFixedOutboundIPStrategy("localhost")
+	messageSendingStrategy := MakeStubbedMessageSendingStrategy()
+
+	peer := MakePeer(fixedUriStrategy, fixedInputStrategy, fixedOutboundIPStrategy, messageSendingStrategy)
+	peer.hardness = *big.NewInt(1)
+	peer.ledger.AddGenesisAccount(ConvertBigIntToString(&rsa.n))
+	return peer
 }
