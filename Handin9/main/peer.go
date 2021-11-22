@@ -84,10 +84,10 @@ func MakePeer(uri UriStrategy, user UserInputStrategy, outbound OutboundIPStrate
 	peer.seed = 0
 	peer.blocksSent = make(map[string]bool)
 	peer.blocksSentMutex = &sync.Mutex{}
-	peer.slotLength = 10 // <-- Change slotlength here!
+	peer.slotLength = 1 // <-- Change slotlength here!
 	peer.slotNumber = 0
-	peer.connectionThreshold = 2 // <-- Change # of peers here!
-	peer.blockTree = nil         //This will ALWAYS point to the genesis block in the tree (after HandleGenesisBlock())
+	peer.connectionThreshold = 10 // <-- Change # of peers here!
+	peer.blockTree = nil          //This will ALWAYS point to the genesis block in the tree (after HandleGenesisBlock())
 	peer.systemRunning = false
 	peer.winners = make(map[int][]string)
 	return peer
@@ -477,7 +477,7 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 								peer.HandleGenesisBlock()
 								peer.systemRunning = true
 								peer.slotNumber += 1
-							} else if peer.VerifyWinningBlock(*peer.rsa, demarshalled, peer.seed) { //check at vedkommende har vundet lotteriet TODO fjernede peer
+							} else if peer.VerifyWinningBlock(*peer.rsa, demarshalled, peer.seed) { //This checks that the block actually is legit and has won
 								fmt.Println("Verified a winning block, adding to tree")
 
 								prevHash := demarshalled[len(demarshalled)-4]
@@ -556,7 +556,8 @@ func (peer *Peer) VerifyWinningBlock(rsa RSA, block Block, seed int) bool {
 	toHash := "LOTTERY:" + strconv.Itoa(peer.seed) + ":" + strconv.Itoa(slotNumber) + ":" + publicKey + ":" + draw
 	drawHash := Hash(toHash)
 	peer.ledger.lock.Lock()
-	dolladollabills := big.NewInt(int64(peer.ledger.Accounts[publicKey]))
+	//dolladollabills := big.NewInt(int64(peer.ledger.Accounts[publicKey]))
+	dolladollabills := big.NewInt(int64(peer.genesisLedger.Accounts[publicKey])) //We always use the genesisblock values for the lottery, also checking
 	peer.ledger.lock.Unlock()
 	x := big.NewInt(0)
 	x.Mul(dolladollabills, drawHash)
@@ -606,14 +607,17 @@ func (peer *Peer) AddChildAndRollbackIfNecessary(newBlockTree *BlockTree, prevha
 
 func (peer *Peer) UpdateLedgerOnRollback() {
 	blocks := peer.blockTree.GetLongestChainOfBlocksAsSlice()
-	peer.ledger = peer.genesisLedger
-	peer.UpdateLedgerWithSliceOfBlocks(blocks)
-	peer.CreateGenesisLedger() //this is because Go does not allow deep copies... *grumble*
+	peer.ledger = peer.genesisLedger           //Reset the ledger
+	peer.UpdateLedgerWithSliceOfBlocks(blocks) //Readd the blocks from the longest chain to ledger
+	peer.CreateGenesisLedger()                 //Make new allocation for genesisledger - this is because Go does not easily allow deep copies... *grumble*
 }
 
-func (peer *Peer) UpdateLedgerWithSliceOfBlocks(blocks []Block) {
+func (peer *Peer) UpdateLedgerWithSliceOfBlocks(blocks []Block) { //This is only used for rollbacks
 	for _, block := range blocks {
-		peer.UpdateLedgerWithBlock(block)
+		peer.UpdateLedgerWithBlock(block[:len(block)-1])
+		publicKey := block[len(block)-1]                                  //The VK has been appended on from the getlongestchainofblocksasslice method
+		blockTransactions := block[:len(block)-1]                         //The transactions within the block
+		peer.ledger.GiveRewardForStake(publicKey, len(blockTransactions)) //We also have to readd the block rewards for the winners
 	}
 }
 
@@ -621,13 +625,16 @@ func (peer *Peer) UpdateLedgerWithBlock(block Block) bool {
 	totalSuccess := true
 	for _, transactionID := range block {
 		if transactionID == "BLOCK" {
-			peer.ledger.Print()
+			peer.ledger.Print() //Have reached the end of the transactions in the block
 			return totalSuccess
 		}
 		transactionStruct := peer.messagesSent[transactionID]
 		success := peer.UpdateLedger(&(transactionStruct.transaction))
 		if success {
 			fmt.Println("Ledger was succesfully updated with transaction from block")
+			peer.nextBlockMutex.Lock() //Since transaction has been ordered, it will now be removed from transactions this peer will use itself in its next block
+			peer.nextBlock = SearchAndRemove(peer.nextBlock, transactionID)
+			peer.nextBlockMutex.Unlock()
 		} else {
 			totalSuccess = false
 			fmt.Println("updating the ledger failed")
@@ -677,7 +684,7 @@ func (peer *Peer) HandleWinning(draw string) {
 	//send out block
 	//sends message (BLOCK, vk, slotnumber, Draw, (U,M), hash, sigma=signature of (BLOCK, slot, (U,M), hash))
 	peer.nextBlockMutex.Lock()
-	block := peer.nextBlock //TODO  - Bør vi tjekke at beskederne i nextBlock ikke er modtaget fra en anden
+	block := peer.nextBlock
 	blockData := peer.nextBlock
 	peer.nextBlock = make([]string, 0)
 	peer.nextBlockMutex.Unlock()
@@ -733,7 +740,7 @@ func (peer *Peer) MakeGenesisBlock() Block {
 	//Calculating hardness
 	x := big.NewInt(0)
 	x.Exp(big.NewInt(2), big.NewInt(271), nil) //For standard setting (10 peers) hardness should be 30*(2^271)
-	x.Mul(x, big.NewInt(2))
+	x.Mul(x, big.NewInt(30))
 	hardness := ConvertBigIntToString(x)
 
 	block = append(block, hardness)
@@ -870,4 +877,20 @@ func (peer *Peer) AddNewSkUser() {
 		peer.rsa = MakeRSAWithKeys("70621195703417734770343058091658851655361561261137761610884679258670223399663358264109783765671832663936755207486891476183124001771723250631352914064206920117635941024601491293081835825560660689267333988928709259887345879848794348613877724159584075736686419675997111138048781709667966034965470003107432057065409218721592297689386038371608402840880519345471603774550343846256833649393555592852268617261622997674448275202937119980781626022142094513891745877971273140692436832862996188468524311487549280326916150648541763048073345791515098905458134163062720372875194208748523538910421681658158526277952333", "47080797135611823180228705394439234436907707507425174407256452839113482266442238842739855843781221775957836804991260984122082667847815500420901942709471280078423960683067660862054557217040440459511555992619139506591563919899196232409251816106389383824457613117331407425365854473111977356643646668738276832537633132845787805744042592646044493003311754064041832749213975665596294833811787512683785544903252943781383044290811821447018358747441605357665865259282762476668907306423923701622064148912823436616682105409323617355598360462566986128445001798326379207490257344784110525958297045948387829570574059")
 		fmt.Println("You now use GenKey 10! (Maybe you asked for that, maybe I'm just nice)")
 	}
+}
+
+func SearchAndRemove(slice Block, elem string) Block { //Takes first element in block and moves it to position of element to be removed, then returns slice without first element
+	pos := -1
+	for index, element := range slice {
+		if element == elem {
+			pos = index
+		}
+	}
+	if pos == -1 {
+		//fmt.Println("Did not remove element from nextBlock")
+		return slice
+	}
+	fmt.Println("Removed element from nextBlock")
+	slice[pos] = slice[0]
+	return slice[1:]
 }

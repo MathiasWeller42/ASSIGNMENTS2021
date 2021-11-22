@@ -65,3 +65,42 @@ func InitTreeNodes() (*BlockTree, *BlockTree, *BlockTree) {
 	return MakeBlockTree(treeNode1), MakeBlockTree(treeNode2), MakeBlockTree(treeNode3)
 
 }
+
+func TestTreeSize(t *testing.T) {
+	tree1, tree2, tree3 := InitTreeNodes()
+	_, tree5, tree6 := InitTreeNodes()
+	_, tree4, tree7 := InitTreeNodes()
+	/*ownBlockHash1 := tree1.Node.OwnBlockHash
+	ownBlockHash2 := tree2.Node.OwnBlockHash
+	ownBlockHash3 := tree3.Node.OwnBlockHash
+	ownBlockHash4 := tree4.Node.OwnBlockHash
+	ownBlockHash5 := tree5.Node.OwnBlockHash
+	ownBlockHash6 := tree6.Node.OwnBlockHash*/
+
+	tree1.AddChild(tree2)
+	tree2.AddChild(tree3)
+	tree2.AddChild(tree4)
+	tree4.AddChild(tree5)
+	tree4.AddChild(tree6)
+	tree6.AddChild(tree7)
+
+	fmt.Println("tree1's printtree:")
+	tree1.PrintTree()
+
+	fmt.Println("treesize:", tree1.GetTreeSize())
+
+}
+
+func TestSearchAndRemove(t *testing.T) {
+	slice := []string{"a", "b", "c", "d", "e", "f", "g"}
+	fmt.Println("slice before:", slice)
+	newSlice := SearchAndRemove(slice, "c")
+	fmt.Println("slice after:", newSlice)
+}
+
+func TestSearchAndRemove2(t *testing.T) {
+	slice := []string{"a", "b", "c", "d", "e", "f", "g"}
+	fmt.Println("slice before:", slice)
+	newSlice := SearchAndRemove(slice, "t")
+	fmt.Println("slice after:", newSlice)
+}

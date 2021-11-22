@@ -85,8 +85,22 @@ func (blockTree *BlockTree) GetLongestChainOfBlocksAsSlice() []Block {
 		if currentTree.Node.OwnBlockHash == "genesis" {
 			return blockList
 		} else {
-			blockList = append([]Block{currentTree.Node.BlockData}, blockList...)
+			block := currentTree.Node.BlockData
+			block = append(block, currentTree.Node.VK)
+			blockList = append([]Block{block}, blockList...)
 			currentTree = currentTree.parent
 		}
 	}
+}
+
+func (blockTree *BlockTree) GetTreeSize() int {
+	amount := 0
+	if blockTree.Node.OwnBlockHash == "genesis" {
+		amount += 1
+	}
+
+	for _, blockTreeChild := range blockTree.children {
+		amount += blockTreeChild.GetTreeSize()
+	}
+	return amount + len(blockTree.children)
 }

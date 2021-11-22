@@ -51,7 +51,7 @@ func (l *Ledger) Print() {
 
 	fmt.Println("Ledger state:")
 	for acc, balance := range l.Accounts {
-		fmt.Println("Account", acc[:8], "has balance", balance, "AU")
+		fmt.Println("Account", acc[:3], "has balance", balance, "AU")
 	}
 }
 
