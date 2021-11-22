@@ -19,14 +19,14 @@ type BlockTreeNode struct {
 
 //TODO FIX DO SHIT NOW Something is wrong when we try to add to a block that is not genesis - child goes missing... AMBER ALERT!!!
 
-func MakeBlockTreeNode(vk string, slot int, draw string, blockData Block, prevBlockHash string, signature string) *BlockTreeNode {
+func MakeBlockTreeNode(vk string, slot int, draw string, blockData Block, signature string) *BlockTreeNode {
 	blockTreeNode := new(BlockTreeNode)
 
 	if slot == 0 {
 		blockTreeNode.OwnBlockHash = "genesis"
 		fmt.Println("Nice, I'm the genesis block!")
 	} else {
-		stringToHash := "BLOCK" + ":" + vk + ":" + strconv.Itoa(slot) + ":" + draw + ":" + strings.Join(blockData, ":") + ":" + prevBlockHash + ":" + signature
+		stringToHash := "BLOCK" + ":" + vk + ":" + strconv.Itoa(slot) + ":" + draw + ":" + strings.Join(blockData, ":") + ":" + signature
 		blockTreeNode.OwnBlockHash = ConvertBigIntToString(Hash(stringToHash))
 	}
 
@@ -35,7 +35,6 @@ func MakeBlockTreeNode(vk string, slot int, draw string, blockData Block, prevBl
 	blockTreeNode.Slot = slot
 	blockTreeNode.Draw = draw
 	blockTreeNode.BlockData = blockData
-	blockTreeNode.PrevBlockHash = prevBlockHash
 	blockTreeNode.TreeNodeSig = signature
 	return blockTreeNode
 }

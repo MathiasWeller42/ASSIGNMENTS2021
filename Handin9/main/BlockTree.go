@@ -3,28 +3,32 @@ package main
 import "fmt"
 
 type BlockTree struct {
-	Node     BlockTreeNode
-	children []BlockTree
+	Node     *BlockTreeNode
+	children []*BlockTree
+	parent   *BlockTree
 }
 
-func MakeBlockTree(root BlockTreeNode) *BlockTree {
+func MakeBlockTree(root *BlockTreeNode) *BlockTree {
 	blockTree := new(BlockTree)
 	blockTree.Node = root
-	blockTree.children = make([]BlockTree, 0)
+	blockTree.parent = nil
+	blockTree.children = make([]*BlockTree, 0)
+
 	return blockTree
 }
 
-func (blockTree *BlockTree) AddChild(node BlockTreeNode) {
-	blockTree.children = append(blockTree.children, *MakeBlockTree(node))
+func (blockTree *BlockTree) AddChild(tree *BlockTree) {
+	blockTree.children = append(blockTree.children, tree)
+	tree.parent = blockTree
 }
 
-func (blockTree *BlockTree) AddChildAt(node BlockTreeNode, blockHash string) {
-	found := blockTree.Search(blockHash)
-	if found == nil {
+func (blockTree *BlockTree) AddChildAt(tree *BlockTree, blockHash string) {
+	foundTree := blockTree.Search(blockHash)
+	if foundTree == nil {
 		fmt.Println("Tried to find a node by a hash that does not exist:", blockHash)
 	} else {
-		fmt.Println("Added a child by looking for a hash")
-		found.AddChild(node)
+		fmt.Println("Adding to block with slotNumber:", foundTree.Node.Slot)
+		foundTree.AddChild(tree)
 	}
 }
 
@@ -63,8 +67,26 @@ func (blockTree *BlockTree) getPointerToPrevBlockAux(currentLength int) (*BlockT
 }
 
 func (blockTree *BlockTree) PrintTree() {
-	fmt.Println("This node with slot", blockTree.Node.Slot, "has", len(blockTree.children), "children")
+	if blockTree.Node.OwnBlockHash == "genesis" {
+		fmt.Println("The genesis node has", len(blockTree.children), "children")
+	} else {
+		fmt.Println("This node with slot", blockTree.Node.Slot, "has", len(blockTree.children), "children and parent slot", blockTree.parent.Node.Slot)
+	}
 	for _, blockTreeChild := range blockTree.children {
 		blockTreeChild.PrintTree()
+	}
+}
+
+func (blockTree *BlockTree) GetLongestChainOfBlocksAsSlice() []Block {
+	leaf := blockTree.GetLongestChainLeaf()
+	blockList := make([]Block, 0)
+	currentTree := leaf
+	for {
+		if currentTree.Node.OwnBlockHash == "genesis" {
+			return blockList
+		} else {
+			blockList = append([]Block{currentTree.Node.BlockData}, blockList...)
+			currentTree = currentTree.parent
+		}
 	}
 }
