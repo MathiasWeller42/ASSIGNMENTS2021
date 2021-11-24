@@ -486,6 +486,14 @@ func (peer *Peer) HandleIncomingMessagesFromPeer(connection net.Conn) {
 									if success {
 										fmt.Println("All transactions valid, adding block to tree")
 										peer.AddBlockToTree(demarshalled)
+										peer.nextBlockMutex.Lock() //Since transactions have been ordered, they will now be removed from transactions this peer will use itself in its next block
+										for _, transactionID := range demarshalled {
+											if transactionID == "BLOCK" {
+												break
+											}
+											peer.nextBlock = SearchAndRemove(peer.nextBlock, transactionID)
+										}
+										peer.nextBlockMutex.Unlock()
 									} else {
 										fmt.Println("One or more invalid transactions, performing rollback")
 										peer.UpdateLedgerOnRollback()
@@ -632,9 +640,6 @@ func (peer *Peer) UpdateLedgerWithBlock(block Block) bool {
 		success := peer.UpdateLedger(&(transactionStruct.transaction))
 		if success {
 			fmt.Println("Ledger was succesfully updated with transaction from block")
-			peer.nextBlockMutex.Lock() //Since transaction has been ordered, it will now be removed from transactions this peer will use itself in its next block
-			peer.nextBlock = SearchAndRemove(peer.nextBlock, transactionID)
-			peer.nextBlockMutex.Unlock()
 		} else {
 			totalSuccess = false
 			fmt.Println("updating the ledger failed")
