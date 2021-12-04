@@ -105,9 +105,9 @@ class hmm:
             for row in range(K):
                 if trans_probs[row][col] != float('-inf'):
                     transitions.append(row)
-            print("These are the transistions: ", transitions)         
+            #print("These are the transistions: ", transitions)         
             allTransitions[col].extend(transitions)
-        print("Alltransitions:", allTransitions)
+        #print("Alltransitions:", allTransitions)
 
 
         w = np.zeros((K, n))
@@ -129,14 +129,13 @@ class hmm:
         return w 
 
     def backtrack_log_opt(self, X, w):
-        init_probs = nlog(self.init_probs)
         emission_probs = nlog(self.emission_probs)
         trans_probs = nlog(self.trans_probs)
 
         pathList = []
         n = w.shape[1]
         x = translate_observations_to_indices(X)
-        K = len(init_probs)
+        K = len(self.init_probs)
 
         allTransitions = [list() for x in range(K)]
         for col in range(K):
@@ -144,42 +143,33 @@ class hmm:
             for row in range(K):
                 if trans_probs[row][col] != float('-inf'):
                     transitions.append(row)
-            print("These are the transistions: ", transitions)         
+            #print("These are the transistions: ", transitions)         
             allTransitions[col].extend(transitions)
-        print("Alltransitions:", allTransitions)
+        #print("Alltransitions:", allTransitions)
 
         #n-1
         lastZ = np.argmax(w[:, n-1])
         lastZProb = np.max(w[:, n-1])
         pathList.insert(0, lastZ)
 
-        #n-2 to 1
         prev = lastZ
         prevProb = lastZProb
         for col in range(n-2, -1, -1):
-            for row in range(K): #For each row (each z-state) in omega
-                max_so_far = float('-inf')
-                for z_i in allTransitions[row]: #For each row in previous column
-                    prev_prob = w[z_i,col-1] + trans_probs[z_i][row]
-                    if prev_prob > max_so_far: 
-                        max_so_far = prev_prob
-                w[row,col] = emission_probs[row][x[col]] + max_so_far
-
-        #The original:
-        prev = lastZ
-        prevProb = lastZProb
-        for col in range(n-2, -1, -1):
-            columnw = w[:, col]
+            #columnw = w[:, col]
             emissionProb = emission_probs[prev][x[col+1]]
-            for index, val in enumerate(columnw): 
+            for index in allTransitions[prev]:
+                #print("prev:", prev)
+                #print("index:", index)
+                val = w[index][col]
                 currentProb = emissionProb + (val + trans_probs[index][prev])
                 if prevProb == currentProb:
                     prevProb = val
                     prev = index
-                    pathList.insert(0,prev)
+                    pathList.append(prev)
                     break
-
-        realPath = translate_indices_to_path(pathList)        
+        #print("pathList:", pathList)
+        pathlistreal = pathList[::-1]
+        realPath = translate_indices_to_path(pathlistreal)       
         return realPath
 
 
@@ -295,7 +285,7 @@ class hmm:
                     pathList.insert(0,prev)
                     break
 
-        realPath = translate_indices_to_path(pathList)        
+        realPath = translate_indices_to_path(pathList)     
         return realPath
 
     def viterbi_update_model(self, x):
@@ -400,6 +390,11 @@ def compute_accuracy(true_ann, pred_ann):
     return sum(1 if true_ann[i] == pred_ann[i] else 0 
                for i in range(len(true_ann))) / len(true_ann)
 
+def printTime():
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S")
+    print("Current Time =", current_time)
+
 
 if __name__ == '__main__':
     #make (and validate) the model
@@ -419,8 +414,8 @@ if __name__ == '__main__':
     true_ann_train_meta = read_fasta_file_as_string("true-ann1", 0)
     true_ann_train = translate_meta_states_to_states(true_ann_train_meta)
 
-    genome_val = read_fasta_file_as_string("genome2", 100000)
-    true_ann_val_meta = read_fasta_file_as_string("true-ann2", 100000)
+    genome_val = read_fasta_file_as_string("genome2", 500000)
+    true_ann_val_meta = read_fasta_file_as_string("true-ann2", 500000)
     true_ann_val = translate_meta_states_to_states(true_ann_val_meta)
     
     print("These are the lengths:", len(genome_train), len(genome_val))
@@ -444,28 +439,39 @@ if __name__ == '__main__':
     print("emission_probs")
     print(hmm.emission_probs)
     #do some decoding
-    now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
-    print("Current Time =", current_time)
+    printTime()
+    print("Beginning w_log_opt:")
+
     w = hmm.compute_w_log_opt(genome_val)
     
-    now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
-    print("Current Time =", current_time)
+    printTime()
+    print("Beginning w_log:")
 
     w2 = hmm.compute_w_log(genome_val)
 
-    now = datetime.now()
-
-    current_time = now.strftime("%H:%M:%S")
-    print("Current Time =", current_time)
+    printTime()
+    print("Beginning backtrack 1:")
 
     z_viterbi_log = hmm.backtrack_log_opt(genome_val, w)
+
+    printTime()
+    print("Ended backtrack 1, starting number 2:")
+
     z_viterbi_log2 = hmm.backtrack_log(genome_val,w2)
+
+    printTime()
+    print("Done with backtrack 2")
+
+    if z_viterbi_log==z_viterbi_log2:
+        print("yay they're equal!!")
+    else:
+        print("oh dear god no..")
+
     ww = hmm.opt_path_prob_log(w)
     ww2 = hmm.opt_path_prob_log(w2)
 
     print("viterbi_log:", ww, ww2)
+    #print("vit log real:",z_viterbi_log, z_viterbi_log2 )
 
     #acc = compute_accuracy(true_ann_val, z_viterbi_log)
     #print("Accuracy:", acc)
