@@ -397,6 +397,7 @@ def printTime():
 
 
 if __name__ == '__main__':
+    '''
     #make (and validate) the model
     hmm = makeHmm()
     valid = validate_hmm(hmm)
@@ -476,9 +477,9 @@ if __name__ == '__main__':
     #acc = compute_accuracy(true_ann_val, z_viterbi_log)
     #print("Accuracy:", acc)
 
-
-
     '''
+
+    
     #--------------------------------------------------------------------------------------#
     hmm = makeHmm()
     valid = validate_hmm(hmm)
@@ -524,8 +525,8 @@ if __name__ == '__main__':
         true_ann_val_meta = read_fasta_file_as_string("true-ann" + str(i), size)
         true_ann_val = translate_meta_states_to_states(true_ann_val_meta)
         
-        w = hmm.compute_w_log(genome_val)
-        z_viterbi_log = hmm.backtrack_log(genome_val, w)
+        w = hmm.compute_w_log_opt(genome_val)
+        z_viterbi_log = hmm.backtrack_log_opt(genome_val, w)
         
         acc = compute_accuracy(true_ann_val, z_viterbi_log)
         print("Accuracy:", acc)
@@ -543,8 +544,8 @@ if __name__ == '__main__':
     #decode
     for i in range(6,11):
         genome_decode = read_fasta_file_as_string("genome" + str(i), size)
-        w = hmm.compute_w_log(genome_decode)
-        z_viterbi_log = hmm.backtrack_log(genome_decode, w)
+        w = hmm.compute_w_log_opt(genome_decode)
+        z_viterbi_log = hmm.backtrack_log_opt(genome_decode, w)
         z_meta = translate_states_to_meta_states(z_viterbi_log)
         #somehow make it into a fasta file
         path = "ASSIGNMENTS2021\Machine Learning\Assignment 3\FastaFiles\Results"
@@ -552,7 +553,7 @@ if __name__ == '__main__':
         fullname = os.path.join(path,filename)
         file = open(fullname, "w")
         file.write(z_meta)
-    '''
+    
     
     
 
