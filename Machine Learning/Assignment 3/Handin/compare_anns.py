@@ -85,6 +85,7 @@ def print_stats(tp, fp, tn, fn):
     acp = 0.25 * (float(tp)/(tp+fn) + float(tp)/(tp+fp) + float(tn)/(tn+fp) + float(tn)/(tn+fn))
     ac = (acp - 0.5) * 2
     print("Sn = %.4f, Sp = %.4f, AC = %.4f" % (sn, sp, ac))
+    return ac
 
 def print_all(true, pred):
     (totalc, tp, fp, tn, fn) = count_c(true, pred)
@@ -96,11 +97,12 @@ def print_all(true, pred):
     if totalr > 0:
         print("Rs   (tp=%d, fp=%d, tn=%d, fn=%d):" % (tp, fp, tn, fn), end=" ")
         print_stats(tp, fp, tn, fn)
-
+    ac = 0
     (total, tp, fp, tn, fn) = count_cr(true, pred)
     if totalc > 0 and totalr > 0:
         print("Both (tp=%d, fp=%d, tn=%d, fn=%d):" % (tp, fp, tn, fn), end=" ")
-        print_stats(tp, fp, tn, fn)
+        ac = print_stats(tp, fp, tn, fn)
+    return ac
 
 if __name__ == '__main__':
     

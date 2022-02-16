@@ -3,6 +3,92 @@ import numpy as np
 
 from datetime import datetime
 
+import sys
+import string
+
+
+def read_ann(filename):
+    lines = []
+    for l in open(filename).readlines():
+        if l[0] != ">" and l[0] != ';':
+            lines.append(l.strip())
+    return "".join(lines)
+
+def count_c(true, pred):
+    total = tp = fp = tn = fn = 0
+    for i in range(len(true)):  
+        if pred[i] == 'C' or pred[i] == 'c':
+            total = total + 1
+            if true[i] == 'C' or true[i] == 'c':
+                tp = tp + 1
+            else:
+                fp = fp + 1
+        if pred[i] == 'N' or pred[i] == 'n':
+            if true[i] == 'N' or true[i] == 'n' or true[i] == 'R' or true[i] == 'r':
+                tn = tn + 1
+            else:
+                fn = fn + 1
+    return(total, tp, fp, tn, fn)
+
+def count_r(true, pred):
+    total = tp = fp = tn = fn = 0
+    for i in range(len(true)):
+        if pred[i] == 'R' or pred[i] == 'r':
+            total = total + 1
+            if true[i] == 'R' or true[i] == 'r':
+                tp = tp + 1
+            else:
+                fp = fp + 1
+        if pred[i] == 'N' or pred[i] == 'n':
+            if true[i] == 'N' or true[i] == 'n' or true[i] == 'C' or true[i] == 'c':
+                tn = tn + 1
+            else:
+                fn = fn + 1
+    return(total, tp, fp, tn, fn)
+
+def count_cr(true, pred):
+    total = tp = fp = tn = fn = 0
+    for i in range(len(true)):
+        if pred[i] == 'C' or pred[i] == 'c' or pred[i] == 'R' or pred[i] == 'r':
+            total = total + 1
+            if (pred[i] == 'C' or pred[i] == 'c') and (true[i] == 'C' or true[i] == 'c'):
+                tp = tp + 1
+            elif (pred[i] == 'R' or pred[i] == 'r') and (true[i] == 'R' or true[i] == 'r'):
+                tp = tp + 1                
+            else:
+                fp = fp + 1
+        if pred[i] == 'N' or pred[i] == 'n':
+            if true[i] == 'N' or true[i] == 'n':
+                tn = tn + 1
+            else:
+                fn = fn + 1
+    return(total, tp, fp, tn, fn)
+
+def print_stats(tp, fp, tn, fn):
+    sn = float(tp) / (tp + fn)
+    sp = float(tp) / (tp + fp)
+    acp = 0.25 * (float(tp)/(tp+fn) + float(tp)/(tp+fp) + float(tn)/(tn+fp) + float(tn)/(tn+fn))
+    ac = (acp - 0.5) * 2
+    print("Sn = %.4f, Sp = %.4f, AC = %.4f" % (sn, sp, ac))
+    return ac
+
+def print_all(true, pred):
+    (totalc, tp, fp, tn, fn) = count_c(true, pred)
+    if totalc > 0:
+        print("Cs   (tp=%d, fp=%d, tn=%d, fn=%d):" % (tp, fp, tn, fn), end=" ")
+        print_stats(tp, fp, tn, fn)
+
+    (totalr, tp, fp, tn, fn) = count_r(true, pred)
+    if totalr > 0:
+        print("Rs   (tp=%d, fp=%d, tn=%d, fn=%d):" % (tp, fp, tn, fn), end=" ")
+        print_stats(tp, fp, tn, fn)
+    ac = 0
+    (total, tp, fp, tn, fn) = count_cr(true, pred)
+    if totalc > 0 and totalr > 0:
+        print("Both (tp=%d, fp=%d, tn=%d, fn=%d):" % (tp, fp, tn, fn), end=" ")
+        ac = print_stats(tp, fp, tn, fn)
+    return ac
+
 def read_fasta_file(filename):
     """
     Reads the given FASTA file f and returns a dictionary of sequences.
@@ -445,12 +531,15 @@ if __name__ == '__main__':
         
         w = hmm.compute_w_log_opt(genome_val)
         z_viterbi_log = hmm.backtrack_log_opt(genome_val, w)
-        
+        acc2 = print_all(translate_states_to_meta_states(z_viterbi_log), true_ann_val_meta)
+        print("Dis be acc2:", acc2)
         acc = compute_accuracy(true_ann_val, z_viterbi_log)
-        print("Accuracy:", acc)
 
-        if acc > best_acc:
-            best_acc = acc 
+
+        print("Old accuracy:", acc)
+
+        if acc2 > best_acc:
+            best_acc = acc2
             A_max = hmm.trans_probs
             fi_max = hmm.emission_probs
         
