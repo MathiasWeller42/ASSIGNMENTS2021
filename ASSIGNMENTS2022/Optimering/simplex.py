@@ -1,6 +1,7 @@
 import numpy as np
 from datetime import datetime
-import scipy
+import scipy.optimize
+import copy
 from fractions import Fraction
 from enum import Enum
 
@@ -13,7 +14,6 @@ def exercise2_7(): return np.array([1,3]),np.array([[-1,-1],[-1,1],[-1,2]]),np.a
 def random_lp(n,m,sigma=10): return np.round(sigma*np.random.randn(n)),np.round(sigma*np.random.randn(m,n)),np.round(sigma*np.abs(np.random.randn(m)))
 
 def exercise2_1(): return np.array([6,8,5,9]),np.array([[2,1,1,3],[1,3,1,2]]),np.array([5,3])
-
 def exercise2_7_after_aux(): return np.array([1,2]),np.array([[-1,-1],[-1,2],[-1,3]]),np.array([3,2,5])
 
 class Dictionary:
@@ -173,9 +173,6 @@ class Dictionary:
         self.N[k] = self.B[l]
         self.B[l] = nonbasic
 
-        print("Pivot, entering: x", self.N[k], "leaving: x", self.B[l])
-
-
 class LPResult(Enum):
     OPTIMAL = 1
     INFEASIBLE = 2
@@ -195,11 +192,9 @@ def bland(D,eps):
     # Otherwise D.B[l] is a leaving variable
        
     k=l=None
-
     # find possible entering variables
     nonbasics = D.C[0,1:]    
-    possible_entering_indexes = [i for i, e in enumerate(nonbasics) if e > 0]
-    # TODO what if e == 0 ?
+    possible_entering_indexes = [i for i, e in enumerate(nonbasics) if e > eps]
 
     # if the list is empty (optimal) return immediately
     if len(possible_entering_indexes) == 0:
@@ -208,33 +203,38 @@ def bland(D,eps):
     # otherwise find the best entering according to D.N
     variable_indexes = D.N[possible_entering_indexes]
     k = possible_entering_indexes[np.argmin(variable_indexes)]
-    
     # then find possible leaving variables
     nonbasic_col = D.C[1:, k+1]
     b_values = D.C[1:, 0]
-    fractions = [(i, b / (-a)) if a != 0 else (i,handleDivisionByZero(a,b)) for (i, (b,a)) in enumerate(zip(b_values, nonbasic_col))]
-    
+    fractions = [(i, handleFraction(a,b,eps)) for (i, (b,a)) in enumerate(zip(b_values, nonbasic_col))]
+
     #Handle unboundedness:
-    if np.all([x[1] <= 0 for x in fractions]):
-        print("Yo WTF maan dis shit unbounded") 
+    if np.all([a >= -eps for a in nonbasic_col]):
         return k, None
 
-    smallest_fraction = np.amin([f for (_,f) in fractions if f>=0])
-    print("This is smallest_fraction:", smallest_fraction)
+    smallest_fraction = np.amin([f for (_,f) in fractions if f>= -eps])
 
     indexes_of_smallest_fraction = [i for (i,f) in fractions if f == smallest_fraction]
 
     variable_indexes_with_smallest_fraction = D.B[indexes_of_smallest_fraction]
     l = indexes_of_smallest_fraction[np.argmin(variable_indexes_with_smallest_fraction)]
 
-    #TODO håndtér division med nul?
     return k,l
 
-def handleDivisionByZero(a,b):
-    if b == 0:
-        return 0
+def handleFraction(a,b, eps):
+    #(i, b / (-a)) if a != 0 else (i,handleDivisionByZero(a,b))
+    if a >= -eps and a <= eps:
+        if b >= -eps and b <= eps:
+            return 0
+        else:
+            return np.iinfo(int).max
+    elif a < -eps:
+        return b / (-a)
     else:
-        return np.iinfo(int).max
+        if b >= -eps and b <= eps:
+            return np.iinfo(int).min 
+        else:
+            return b / (-a)
 
 def largest_coefficient(D,eps):
     # Assumes a feasible dictionary D and find entering and leaving
@@ -250,7 +250,32 @@ def largest_coefficient(D,eps):
     # Otherwise D.B[l] is a leaving variable
     
     k=l=None
-    # TODO
+    nonbasics = D.C[0,1:]    
+    possible_entering = [(i,e) for i,e in enumerate(nonbasics) if e > eps]
+    
+    # if the list is empty (optimal) return immediately
+    if len(possible_entering) == 0:
+        return k,l
+
+    # otherwise we now find the best entering according to D.N:
+    k = max(possible_entering, key= lambda item: (item[1], -D.N[item[0]]))[0]
+    
+    # then find possible leaving variables (same as Bland)
+    nonbasic_col = D.C[1:, k+1]
+    b_values = D.C[1:, 0]
+    fractions = [(i, handleFraction(a,b,eps)) for (i, (b,a)) in enumerate(zip(b_values, nonbasic_col))]
+
+    #Handle unboundedness:
+    if np.all([a >= -eps for a in nonbasic_col]):
+        return k, None
+
+    smallest_fraction = np.amin([f for (_,f) in fractions if f>= -eps])
+
+    indexes_of_smallest_fraction = [i for (i,f) in fractions if f == smallest_fraction]
+
+    variable_indexes_with_smallest_fraction = D.B[indexes_of_smallest_fraction]
+    l = indexes_of_smallest_fraction[np.argmin(variable_indexes_with_smallest_fraction)]
+
     return k,l
 
 def largest_increase(D,eps):
@@ -268,9 +293,46 @@ def largest_increase(D,eps):
     
     k=l=None
     # TODO
+
+    nonbasics = D.C[0,1:]    
+    possible_entering = [i for i,e in enumerate(nonbasics) if e > eps]
+    
+    # if the list is empty (optimal) return immediately
+    if len(possible_entering) == 0:
+        return k,l
+
+    b_values = D.C[1:, 0]
+    fractions = np.zeros((possible_entering.shape[0], D.C.shape[1]-1))
+    for (j, index) in enumerate(possible_entering):
+        nonbasic_col = D.C[1:, index+1]
+        fractions[:, j] = [handleFraction(a,b,eps) for (b,a) in zip(b_values, nonbasic_col)]
+    
+    #TODO check unboundedness
+
+    fractions = fractions * D.C[0,1:][possible_entering]
+    
+    k,l = np.argmax(fractions)
+    
+    
+    # then find possible leaving variables (same as Bland)
+    #nonbasic_col = D.C[1:, k+1]
+    #b_values = D.C[1:, 0]
+    #fractions = [(i, handleFraction(a,b,eps)) for (i, (b,a)) in enumerate(zip(b_values, nonbasic_col))]
+
+    #Handle unboundedness:
+    if np.all([a >= -eps for a in nonbasic_col]):
+        return k, None
+
+    smallest_fraction = np.amin([f for (_,f) in fractions if f>= -eps])
+
+    indexes_of_smallest_fraction = [i for (i,f) in fractions if f == smallest_fraction]
+
+    variable_indexes_with_smallest_fraction = D.B[indexes_of_smallest_fraction]
+    l = indexes_of_smallest_fraction[np.argmin(variable_indexes_with_smallest_fraction)]
+
     return k,l
 
-def lp_solve(c,A,b,dtype=Fraction,eps=0,pivotrule=lambda D: bland(D,eps=0),verbose=False):
+def lp_solve(c,A,b,dtype=Fraction,eps=0.,pivotrule=lambda D,eps: bland(D,eps),verbose=False):
     # Simplex algorithm
     #    
     # Input is LP in standard form given by vectors and matrices
@@ -293,25 +355,79 @@ def lp_solve(c,A,b,dtype=Fraction,eps=0,pivotrule=lambda D: bland(D,eps=0),verbo
     # If LP has an optimal solution the return value is
     # LPResult.OPTIMAL,D, where D is an optimal dictionary.
 
-    D=Dictionary(c,A,b)
+    D=Dictionary(c,A,b,dtype)
+    if verbose:
+        print("Solving the dictionary:")
+        print(D)
+        print("Checking whether to run a dual problem...")
+    
     bs_below_zero = b <= 0
     if bs_below_zero.any():
-        return LPResult.INFEASIBLE, None
+        if verbose:
+            print("Initial problem infeasible. Running dual")
+        #save the primal and create the dual
+        oldDict = copy.deepcopy(D)
+        D.C[0,:] = -np.ones(D.C.shape[1], dtype=dtype)
+        D.C[0,0] = Fraction(0)
+        D.C = -D.C.T
+        oldN = D.N
+        D.N = D.B
+        D.B = oldN
+        if verbose:
+            print("The dual dictionary to solve:")
+            print(D)
+        result, dual = runSolve(D, eps, pivotrule, verbose)
+        if result == LPResult.UNBOUNDED:
+            if verbose:
+                print("End of computation, result:")
+            return LPResult.INFEASIBLE, None
+        else:
+            #setup to run the primal (phase 2)
+            dual.C = -dual.C.T
+            dualN = dual.N
+            dual.N = dual.B
+            dual.B = dualN
+            dual.C[0,:] = np.zeros(dual.C.shape[1], dtype=dtype)
+            for (i, coeff) in enumerate(oldDict.C[0, 1:]):
+                currentOldVar = oldDict.N[i]
+                if currentOldVar in dual.B:
+                    index = np.where (dual.B == currentOldVar)[0][0]
+                    dual.C[0,:] += coeff * dual.C[index + 1, :]
+                else:
+                    dual.C[0,i+1] += coeff
+            if verbose:
+                print("End of dual, now running phase 2")
+                print("The primal dictionary looks like this:")
+                print(D)
+    elif verbose:
+        print("Dual problem not needed")
 
+    return runSolve(D,eps,pivotrule,verbose)        
+
+def runSolve(D,eps=0.,pivotrule=lambda D,eps: bland(D,eps),verbose=False): 
     while True:
-        k,l = pivotrule(D)
+        k,l = pivotrule(D,eps)
+        
         if k == None:
+            if verbose:
+                print("End of computation, result:")
             return LPResult.OPTIMAL, D 
         elif l == None:
+            if verbose:
+                print("End of computation, result:")
             return LPResult.UNBOUNDED, None 
         else:
+            if verbose:
+                print("Found pivots, entering: x", D.N[k], "leaving: x", D.B[l])
             D.pivot(k,l)
-            print(D)
+            if verbose:
+                print("Dictionary after pivot:")
+                print(D)
     
-  
 def run_examples():
+    """
     # Example 1
-    """c,A,b = example1()
+    c,A,b = example1()
     D=Dictionary(c,A,b)
     print('Example 1 with Fraction')
     print('Initial dictionary:')
@@ -351,14 +467,15 @@ def run_examples():
     print('x1 is entering and x0 leaving:')
     D.pivot(0,1)
     print(D)
-    print()"""
-
+    print()
+    
+"""
     # Solve Example 1 using lp_solve
     c,A,b = example1()
     D=Dictionary(c,A,b)
     print('lp_solve Example 1 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:')
     print(D)
-    res,D=lp_solve(c,A,b)
+    res,D=lp_solve(c,A,b,pivotrule=lambda D,eps: largest_coefficient(D,eps),verbose=True)
     print(res)
     print(D)
     print()
@@ -366,23 +483,25 @@ def run_examples():
     # Solve Example 2 using lp_solve 
     c,A,b = example2()
     print('lp_solve Example 2 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:')
-    res,D=lp_solve(c,A,b)
+    res,D=lp_solve(c,A,b,pivotrule=lambda D,eps: largest_coefficient(D,eps),verbose=True)
     print(res)
     print(D)
     print()
+    
 
     # Solve Exercise 2.5 using lp_solve 
     c,A,b = exercise2_5()
     print('lp_solve Exercise 2.5 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:')
-    res,D=lp_solve(c,A,b)
+    res,D=lp_solve(c,A,b,verbose=False)
     print(res)
     print(D)
     print()
 
+
     # Solve Exercise 2.6 using lp_solve
     c,A,b = exercise2_6()
     print('lp_solve Exercise 2.6 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:')
-    res,D=lp_solve(c,A,b)
+    res,D=lp_solve(c,A,b,verbose=False)
     print(res)
     print(D)
     print()
@@ -390,11 +509,12 @@ def run_examples():
     # Solve Exercise 2.7 using lp_solve
     c,A,b = exercise2_7()
     print('lp_solve Exercise 2.7 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:')
-    res,D=lp_solve(c,A,b)
+    res,D=lp_solve(c,A,b,verbose=False)
     print(res)
     print(D)
-    print()
+    print() 
 
+'''
     #Integer pivoting
     c,A,b=example1()
     D=Dictionary(c,A,b,int)
@@ -420,6 +540,7 @@ def run_examples():
     print('x2 is entering and x4 leaving:')
     D.pivot(1,1)
     print(D)
+    '''
 
 
 def run_examples_homebrew():
@@ -450,32 +571,66 @@ def experiment1():
     print("Testing implementation")
     time_frac = 0
     time_float = 0
-    #time_scipy = 0
-    for i in range(1000): #fractions
+    time_scipy = 0
+    pivotrule = lambda D,eps : largest_coefficient(D,eps)
+    verbose = False
+    print("#################### Running FRACTIONS")
+    for i in range(200): #fractions
         c,A,b = generateDictionary(i)
         starttime = datetime.now()
-        lp_solve(c,A,b)
+        res,_ = lp_solve(c,A,b,pivotrule=pivotrule,verbose=verbose)
         time_frac = time_frac + (datetime.now() - starttime).total_seconds()
-    for i in range(1000): #floats
+        print("this is the FRACTION result: ", res, "and i:", i)
+    
+    print("#################### Running FLOATS")
+    for i in range(200): #floats
         c,A,b = generateDictionary(i)
         starttime = datetime.now()
-        lp_solve(c,A,b,dtype=np.float64)
-        time_float += (datetime.now() - starttime)
-    # TODO check scipy implementation also
+        D=Dictionary(c,A,b)
+        #print("This is the new dictionary", i, ":", D)
+        res,_ = lp_solve(c,A,b,dtype=np.float64,eps=0.001,pivotrule=pivotrule,verbose=verbose)
+        time_float = time_float + (datetime.now() - starttime).total_seconds()
+        print("this is the FLOAT result: ", res, "and i:", i)
+
+    print("#################### Running SCIPY") 
+    for i in range(200): #scipy
+        c,A,b = generateDictionary(i)
+        c = -c
+        D=Dictionary(c,A,b)
+        #print("This is the new dictionary", i, ":", D)
+        starttime = datetime.now()
+        res = scipy.optimize.linprog(c=c,A_ub=A,b_ub=b, method='simplex')
+        time_scipy = time_scipy + (datetime.now() - starttime).total_seconds()
+        print("this is the SCIPY res:", statusconv(res.status), " and i: ", i)
+    
+    print("Time for fraction implementation", time_frac)
+    print("Time for float implementation:", time_float)
+    print("Time for scipy implementation:", time_scipy)
 
 def generateDictionary(seed):
     np.random.seed(seed)
-    n = np.random.randint(2,10)
-    m = np.random.randint(2,10)
-    print("This is n and m:", n, m)
-    c = np.random.randint(-10,10,size=n)
+    n = np.random.randint(2,3)
+    m = np.random.randint(2,3)
+    #print("This is n and m:", n, m)
+    c = np.random.randint(0,20,size=n)
     b = np.random.randint(1,10,size=m)
     A = np.random.randint(-10,10,size=(m,n))
     return c,A,b
+
+def statusconv(a):
+    if a == 0:
+        return LPResult.OPTIMAL
+    elif a == 3:
+        return LPResult.UNBOUNDED
+    else:
+        return LPResult.INFEASIBLE
+    
 
 if __name__ == "__main__":
     print("######################################### NEW RUN ##########################################################")
     #run_examples()
     #run_examples_homebrew()
     experiment1()
+
+
 
